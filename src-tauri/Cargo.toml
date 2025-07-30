@@ -16,6 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+dotenvy = "0.15"
 
 [dependencies]
 tauri = { version = "2", features = [] }
@@ -28,3 +29,6 @@ futures = "0.3"
 tokio-util = { version = "0.7", features = ["compat"] }
 log = { version = "0.4", features = ["std", "serde"] }
 walkdir = "2"
+chrono = { version = "0.4", features = ["unstable-locales"] }
+printers = "2.2"
+dotenvy = "0.15"

@@ -95,6 +95,11 @@ button {
   margin-right: 5px;
 }
 
+.invalid-row {
+  background-color: #ffe6e6 !important; /* Light red background */
+  color: #a70000;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;

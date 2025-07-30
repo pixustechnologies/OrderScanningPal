@@ -1,44 +1,68 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import pixusLogo from "./../assets/logo.png";
 import { invoke } from "@tauri-apps/api/core";
 import "./../App.css";
-import { Accordion, AppBar, Box, Button, Card, Paper, TextField, Typography } from "@mui/material";
-import Diversity1Icon from '@mui/icons-material/Diversity1';
+import { Box, Button,  CircularProgress,  Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from "@mui/material";
 import Layout from './../Layout';
 import { useNavigate } from "react-router-dom";
+
+type Order = {
+  order_number: string;
+  part_number: string;
+  due_quantity: number;
+  assn_number: string;
+};
 
 function WelcomePage() {
   const [orderNumber, setOrderNumber] = useState("");
 
   const orderNumValid = orderNumber.length == 8;
+  const [orders, setOrders] = useState<Order[] | null>(null);
 
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 5 ;
+
   const navigate = useNavigate();
 
-  const handleClick = () => {
-    // query INFO!
-    const welcomeState = { orderNumber: orderNumber };
-    // invoke<String>('snu', { serialNumber: "015"})
-    //                 .then((data) => {
-    //                     // we assume only first bc only 'SHOULD' have 1 order
-    //                     console.log("Error fetching orders:", data);
-    //                 })
-    //                 .catch((error) => {
-    //                     console.error("Error fetching orders:", error);
-    //                 });
+  useEffect(() => {
+    invoke<Order[]>('get_orders', { })
+        .then((data) => {
+          setOrders(data);
+          console.log(data)
+        })
+        .catch((error) => {
+            console.error("Error fetching orders:", error);
+        });
+            
+  }, [])
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleTableClick = (orderNum: String) => {
+    const welcomeState = { orderNumber: orderNum };
     navigate('/main', {state: welcomeState} );
   }
+
+  const handleClick = () => {
+    const welcomeState = { orderNumber: orderNumber };
+    navigate('/main', {state: welcomeState} );
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    const welcomeState = { orderNumber: orderNumber };
+    if (event.key === "Enter" && orderNumValid) {
+      navigate('/main', {state: welcomeState} );
+    }
+
+  };
 
 
   return (
     <Layout>
       <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', height: '100%'}}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-evenly', gap: '2', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-evenly', gap: 4, alignItems: 'center' }}>
           <img src={pixusLogo} />
          
           <Typography variant="h4"> Welcome to my OrderScanningPal!</Typography>
@@ -46,8 +70,55 @@ function WelcomePage() {
 
         </Box>
 
+        { orders ? (
+        <Box>
+        <Box sx={{ alignItems: 'center',  width: 480}}>
+          <TableContainer component={Paper}>
+              <Table>
+                  <TableHead>
+                  <TableRow>
+                      <TableCell>Order Number</TableCell>
+                      <TableCell>Part Number</TableCell>
+                  </TableRow>
+                  </TableHead>
+                  <TableBody>
+                  {orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((order, index) => (
+                      <TableRow 
+                        key={index}
+                        hover
+                        onClick={(_event) => handleTableClick(order.order_number)}
+                        role="checkbox"
+                        tabIndex={-1}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                      <TableCell>{order.order_number}</TableCell>
+                      <TableCell>{order.part_number}</TableCell>
+                      </TableRow>
+                  ))}
+                  </TableBody>
+              </Table>
+          </TableContainer>
+        </Box>
+          <TablePagination
+            rowsPerPageOptions={[5]}
+            component="div"
+            count={orders.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+          />
         
-        <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-around', height: '30%'}}> 
+        </Box>
+        
+        ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: 2, height: '100%'}}>
+                <Typography> Loading orders </Typography>
+                <CircularProgress />
+            </Box>
+        )}
+
+        
+        <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-around', height: '20%'}}> 
           <TextField 
             id="order-number" 
             label="Order Number" 
@@ -57,6 +128,7 @@ function WelcomePage() {
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setOrderNumber(event.target.value);
             }}
+            onKeyDown={handleKeyDown}
             required
           />
           
