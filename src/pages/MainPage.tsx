@@ -5,6 +5,8 @@ import {Box, Button, Card, TextField, Typography, Snackbar, SnackbarCloseReason,
 import { DataGrid, GridColDef, GridRowSelectionModel  } from '@mui/x-data-grid';
 import Layout from './../Layout';
 import { useNavigate, useLocation } from "react-router-dom";
+import confetti from 'canvas-confetti';
+
 
 type Order = {
   order_number: string;
@@ -107,6 +109,37 @@ function MainPage() {
             
         }
     }, [location.state.orderNumber])
+
+    
+
+    useEffect(() => {
+        if (serialNumber.endsWith("69")) {
+            fireConfetti();
+        }
+    }, [serialNumber])
+
+    const fireConfetti = () => {
+        confetti({
+            particleCount: 500,
+            spread: 150,
+            drift: -1,
+            ticks: 400,
+            origin: { y: 0.2, x: 0.8 },
+        });
+        // confetti({
+        //     particleCount: 500,
+        //     angle: -135,
+        //     spread: 130,
+        //     drift: -1,
+        //     ticks: 400,
+        //     origin: { y: 0.0, x: 1 },
+        // });
+        // confetti({
+        //     particleCount: 100,
+        //     spread: 70,
+        //     origin: { y: 0.6 },
+        // });
+    };
 
     const trimOrderFields = (order: Order): Order => ({
         ...order,
@@ -323,17 +356,17 @@ function MainPage() {
     <Layout>
         { loaded ? (
         <>
-            <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', gap: 0.5, height: '100%'}}>
+            <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', gap: '0.5em', height: '100%'}}>
                 <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center',  width: '100%'}}>
                     <Typography variant="h4">Print Selection:</Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center',  justifyContent: 'space-around', width: '100%'}}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-around', gap: 0.5, height: '100%', minWidth: 310}}>
+                    <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center',  justifyContent: 'space-around', width: '100%', flexWrap: 'wrap'}}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-around', height: '100%', minWidth: 300}}>
                             <Typography>Order Number: {order?.order_number}</Typography>
                             <Typography>Due Quantity: {order?.due_quantity}</Typography>
                             <Typography>Part Number: {order?.part_number}</Typography>
                             <Typography>Assn Number: {order?.assn_number}</Typography>
                         </Box>
-                            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: 1, p: 1}}>
+                            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: '0.25em', p: '0.25em'}}>
                                 <Button  
                                     id="print-minus-button" 
                                     variant="outlined"
@@ -361,7 +394,7 @@ function MainPage() {
                                 </Button>
                             </Box>
 
-                            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: 1, p: 1}}>
+                            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: '0.25em', p: '0.25em'}}>
                                 <Button
                                     id="serial-number-minus-button" 
                                     variant="outlined"
@@ -390,8 +423,8 @@ function MainPage() {
                     </Box>
                 </Box>
 
-                <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-around', gap: 4}}> 
-                    <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-around', gap: 4}}> 
+                <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-around', gap: '2em'}}> 
+                    <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-around', gap: '2em'}}> 
                         <Button  
                             id="starting-button" 
                             variant="outlined"
@@ -416,25 +449,7 @@ function MainPage() {
                             Final Docs
                         </Button>
                     </Box>  
-                    <Card sx={{ display: 'flex',  alignItems: 'center',  height: 370,}}> 
-                        {/* <TableContainer component={Paper}>
-                            <Table>
-                                <TableHead>
-                                <TableRow>
-                                    <TableCell>Print Type</TableCell>
-                                    <TableCell>Note</TableCell>
-                                </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                {printOrders.map((order, index) => (
-                                    <TableRow key={index}>
-                                    <TableCell>{order.print_type}</TableCell>
-                                    <TableCell>{order.notes}</TableCell>
-                                    </TableRow>
-                                ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer> */}
+                    <Card sx={{ display: 'flex',  alignItems: 'center',  height: '23.25em',}}> 
                         <DataGrid
                             rows={printOrderRows}
                             columns={columns}
@@ -446,6 +461,7 @@ function MainPage() {
                             }}
                             rowSelectionModel={rowSelectionModel}
                             sx={{ border: 0 }}
+                            // getRowHeight={() => 'auto'}
                             getRowClassName={(params) => {
                                 if (params.row.print_type == "BOM" || params.row.print_type == "Config"  || params.row.print_type == "SNL" ) {
                                     return '';
@@ -465,7 +481,7 @@ function MainPage() {
                 </Box>
                 
               
-                <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-around', gap: 2, p: 1 }}> 
+                <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-around', gap: '1em', p: '0.5em' }}> 
                     <Box >
                         <Checkbox sx={{ 'aria-label': 'Checkbox demo' }} 
                             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
@@ -527,7 +543,7 @@ function MainPage() {
             </Snackbar>
         </>
         ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: 2, height: '100%'}}>
+            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: '1em', height: '100%', minHeight: '35em'}}>
                 <Typography> Loading your order </Typography>
                 <CircularProgress />
                 

@@ -1,19 +1,23 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 // use tauri::ipc::Response;
 use serde::{Serialize, Deserialize};
+use serde_json::Value;
 use tiberius::{Client, Config, AuthMethod};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncReadCompatExt};
 use futures::TryStreamExt;
-use std::process::{Command, ExitStatus};
 use walkdir::WalkDir;
+use chrono::prelude::*;
+use std::process::{Command, ExitStatus};
 use std::path::PathBuf;
 use std::io::prelude::*;
-use chrono::prelude::*;
+use std::io::BufReader;
+use std::env;
 use std::fs::{self, OpenOptions, File};
 use printers::{get_default_printer, get_printer_by_name};
-use std::env;
 use dotenvy::dotenv;
+use tauri::{AppHandle, Manager, Emitter};
+
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -45,6 +49,14 @@ struct PrintOrderRow {
     notes: String,
 }
 
+#[derive(Serialize, Deserialize)]
+struct Settings {
+  font_size: i32,
+  dark_mode: bool,
+  part_list: Vec<String>,
+}
+
+
 #[tauri::command]
 async fn get_orders() -> Result<Vec<Order>, String> {
     let mut client = sql_setup().await?;
@@ -63,8 +75,8 @@ WHERE   om.ORDNUM_10 = rd.ORDNUM_11
         AND ps.PARPRT_02 = om.PRTNUM_10
         AND om.STATUS_10 = '3'
         AND ((pm.TYPE_01 = 'S' 
-                AND (LEFT(pm.PRTNUM_01, 3) = '0' + '2' + 'A' OR LEFT(pm.PRTNUM_01, 4) = 'K' + '0' + '2' + 'A') )
-        OR rd.PRTNUM_11 = ps.COMPRT_02)
+                AND (LEFT(pm.PRTNUM_01, 2) = '02' OR LEFT(pm.PRTNUM_01, 3) = 'K02') )
+        OR (rd.PRTNUM_11 = ps.COMPRT_02  AND (LEFT(ps.PARPRT_02, 2) = '02' OR LEFT(ps.PARPRT_02, 3) = 'K02')))
 
 ORDER BY om.ORDNUM_10 DESC"; // om.PLANID_10 != '000' removes screws?
 
@@ -199,6 +211,8 @@ ORDER BY wn.MAXID";
         print_type: "SNL".to_string(),
         notes: "Serial Number List".to_string(),
     });
+    
+    let app_settings = load_settings()?;
 
     while let Some(item) = stream.try_next().await.map_err(|e| format!("Row error: {}", e))? {
         if let Some(row) = item.into_row() {
@@ -210,7 +224,8 @@ ORDER BY wn.MAXID";
             let notes: Option<&str> = row.get(5);
             // remove if note empty OR if starting with ~
             let c = notes.and_then(|s| s.chars().next());
-            if notes == Some("") || c == Some('~') {
+            let pt = print_type.map(|s| s.trim().to_string()).expect("print_type should have a value");
+            if notes == Some("") || c == Some('~') || app_settings.part_list.contains(&pt) {
                 continue;
             } else if c == Some('?') { 
                 if let Some(last_order) = orders.last_mut() {
@@ -263,7 +278,7 @@ async fn sql_setup() -> Result<Client<Compat<TcpStream>>, String> {
         .map_err(|e| format!("TCP connect error: {}", e))?;
     let tcp = tcp.compat();
 
-    let mut client = Client::connect(config, tcp)
+    let client = Client::connect(config, tcp)
         .await
         .map_err(|e| format!("DB connect error: {}", e))?;
 
@@ -675,6 +690,63 @@ fn finder(root_dir: &str, search_term: String) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
+#[tauri::command]
+fn save_settings(settings: Settings, app_handle: tauri::AppHandle) -> Result<(), String> {
+    let file_path = "../documents/appSettings.json";
+    println!("dm{} fs{}", settings.dark_mode, settings.font_size);
+    let json_string = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("Failed to serialize Settings to JSON: {}", e))?;
+
+    let mut file = File::create(file_path)
+        .map_err(|e| format!("Failed to create file {}: {}", file_path, e))?;
+    file.write_all(json_string.as_bytes())
+        .map_err(|e| format!("Failed to write to file {}: {}", file_path, e))?;
+
+    //update frontend
+    app_handle
+        .emit("settings-updated", ())
+        .map_err(|e| format!("Failed to emit settings-updated event: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn load_settings() -> Result<Settings, String> {
+    let file_path = "../documents/appSettings.json";
+    if !fs::exists(file_path).expect("Can't check existence of appSettings") {
+        match create_app_settings(file_path) {
+            Ok(_) => (),
+            Err(e) => return Err(e.to_string()),
+         }
+    }
+
+    let file = File::open(file_path)
+        .map_err(|_| "Failed to open settings file")?;
+    let reader = BufReader::new(file);
+
+    let json_value: Value = serde_json::from_reader(reader)
+        .map_err(|_| "Failed to process json file")?;
+    let settings: Settings = serde_json::from_value(json_value)
+        .map_err(|e| format!("Failed to parse JSON into Settings: {}", e))?;
+
+    Ok(settings)
+}
+
+fn create_app_settings(path: &'static str) -> Result<(), std::io::Error>{
+    let settings = Settings {
+        font_size: 16,
+        dark_mode: true,
+        part_list: Vec::new(),
+    };
+    
+    let json_string = serde_json::to_string_pretty(&settings)?;
+
+    let mut file = File::create(path)?;
+    file.write_all(json_string.as_bytes())?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -686,6 +758,8 @@ pub fn run() {
             print,
             get_serial_number,
             get_orders,
+            save_settings,
+            load_settings,
             ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

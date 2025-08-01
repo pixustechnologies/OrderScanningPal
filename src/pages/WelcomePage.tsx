@@ -5,6 +5,7 @@ import "./../App.css";
 import { Box, Button,  CircularProgress,  Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from "@mui/material";
 import Layout from './../Layout';
 import { useNavigate } from "react-router-dom";
+import SettingsIcon from '@mui/icons-material/Settings';
 
 type Order = {
   order_number: string;
@@ -55,24 +56,30 @@ function WelcomePage() {
     if (event.key === "Enter" && orderNumValid) {
       navigate('/main', {state: welcomeState} );
     }
-
   };
+
+  const handleSettings = () => {
+    navigate('/settings');
+  }
 
 
   return (
     <Layout>
-      <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', height: '100%'}}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-evenly', gap: 4, alignItems: 'center' }}>
-          <img src={pixusLogo} />
-         
-          <Typography variant="h4"> Welcome to my OrderScanningPal!</Typography>
-          {/* <Diversity1Icon></Diversity1Icon> */}
-
+      <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: '1em'}}>
+        <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, width: '100%', gap: '2em' }}>
+          {/* Centered content */}
+            <img src={pixusLogo} alt="Logo" style={{ height: '4em' }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5em', overflowY: 'auto' }}>
+            <Typography variant="h4">OrderScanningPal!</Typography>
+          </Box>
+          <SettingsIcon  onClick={handleSettings} sx={{ cursor: 'pointer', fontSize: '2em', marginLeft: '3em' }} />
         </Box>
+        
+
 
         { orders ? (
         <Box>
-        <Box sx={{ alignItems: 'center',  width: 480}}>
+        <Box sx={{ alignItems: 'center',  width: '30em'}}>
           <TableContainer component={Paper}>
               <Table>
                   <TableHead>
@@ -111,14 +118,14 @@ function WelcomePage() {
         </Box>
         
         ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: 2, height: '100%'}}>
+            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: '0.5em', height: '100%', minHeight: '25em'}}>
                 <Typography> Loading orders </Typography>
                 <CircularProgress />
             </Box>
         )}
 
         
-        <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-around', height: '20%'}}> 
+        <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-around', height: '6em', gap: '1em'}}> 
           <TextField 
             id="order-number" 
             label="Order Number" 
