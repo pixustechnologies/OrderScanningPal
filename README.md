@@ -3,4 +3,4 @@
 
 ## Requirements
 
-.env file containing database setup
+.env.dev and .env.prod file containing database setup

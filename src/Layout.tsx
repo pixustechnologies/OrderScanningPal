@@ -32,8 +32,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         minWidth: '100%',
         minHeight: '100vh',
         display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
         padding: 2,
         fontSize: `${settings.font_size}px`,
       }}

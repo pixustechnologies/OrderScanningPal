@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import pixusLogo from "./../assets/logo.png";
+import lightLogo from "./../assets/PixusLogoHD.png";
+import darkLogo from "./../assets/PixusLogoHDDarkmode.png";
 import { invoke } from "@tauri-apps/api/core";
 import "./../App.css";
-import { Box, Button,  CircularProgress,  Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from "@mui/material";
+import { Box, Button,  CircularProgress,  Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography, useTheme } from "@mui/material";
 import Layout from './../Layout';
 import { useNavigate } from "react-router-dom";
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -22,6 +23,10 @@ function WelcomePage() {
 
   const [page, setPage] = useState(0);
   const rowsPerPage = 5 ;
+
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
+
 
   const navigate = useNavigate();
 
@@ -65,10 +70,10 @@ function WelcomePage() {
 
   return (
     <Layout>
-      <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: '1em'}}>
+      <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: '1.75em'}}>
         <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, width: '100%', gap: '2em' }}>
           {/* Centered content */}
-            <img src={pixusLogo} alt="Logo" style={{ height: '4em' }} />
+            <img src={isDarkMode ? darkLogo : lightLogo} alt="Logo" style={{ height: '4em' }} />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5em', overflowY: 'auto' }}>
             <Typography variant="h4">OrderScanningPal!</Typography>
           </Box>
@@ -78,34 +83,34 @@ function WelcomePage() {
 
 
         { orders ? (
-        <Box>
-        <Box sx={{ alignItems: 'center',  width: '30em'}}>
-          <TableContainer component={Paper}>
-              <Table>
-                  <TableHead>
-                  <TableRow>
-                      <TableCell>Order Number</TableCell>
-                      <TableCell>Part Number</TableCell>
-                  </TableRow>
-                  </TableHead>
-                  <TableBody>
-                  {orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((order, index) => (
-                      <TableRow 
-                        key={index}
-                        hover
-                        onClick={(_event) => handleTableClick(order.order_number)}
-                        role="checkbox"
-                        tabIndex={-1}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                      <TableCell>{order.order_number}</TableCell>
-                      <TableCell>{order.part_number}</TableCell>
-                      </TableRow>
-                  ))}
-                  </TableBody>
-              </Table>
-          </TableContainer>
-        </Box>
+        <Box sx={{minHeight: '25em'}}> 
+          <Box sx={{ alignItems: 'center',  width: '30em'}}>
+            <TableContainer component={Paper}>
+                <Table>
+                    <TableHead>
+                    <TableRow>
+                        <TableCell>Order Number</TableCell>
+                        <TableCell>Part Number</TableCell>
+                    </TableRow>
+                    </TableHead>
+                    <TableBody>
+                    {orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((order, index) => (
+                        <TableRow 
+                          key={index}
+                          hover
+                          onClick={(_event) => handleTableClick(order.order_number)}
+                          role="checkbox"
+                          tabIndex={-1}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                        <TableCell>{order.order_number}</TableCell>
+                        <TableCell>{order.part_number}</TableCell>
+                        </TableRow>
+                    ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+          </Box>
           <TablePagination
             rowsPerPageOptions={[5]}
             component="div"
@@ -114,7 +119,6 @@ function WelcomePage() {
             page={page}
             onPageChange={handleChangePage}
           />
-        
         </Box>
         
         ) : (

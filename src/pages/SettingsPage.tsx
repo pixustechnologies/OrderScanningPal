@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
-import pixusLogo from "./../assets/logo.png";
+import lightLogo from "./../assets/PixusLogoHD.png";
+import darkLogo from "./../assets/PixusLogoHDDarkmode.png";
 import { invoke } from "@tauri-apps/api/core";
 import "./../App.css";
-import { Box, Button,  CircularProgress,  Paper, TextField, Typography, List, ListItem, ListItemText, Switch, IconButton, ListItemSecondaryAction, Divider } from "@mui/material";
+import { Box, Button,  CircularProgress,  Paper, TextField, Typography, List, ListItem, ListItemText, Switch, IconButton, ListItemSecondaryAction, Divider, useTheme } from "@mui/material";
 import Layout from './../Layout';
 import { useNavigate } from "react-router-dom";
 import KeyboardBackspaceIcon from '@mui/icons-material/KeyboardBackspace';
-import { DarkMode } from "@mui/icons-material";
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import MyAlert, { SnackbarMessage } from "../components/MyAlert";
 
 
 type Settings = {
@@ -16,6 +17,7 @@ type Settings = {
   dark_mode: boolean;
   part_list: String[];
 };
+
 // font size, avoid list, dark mode
 function SettingsPage() {
   const [settings, setSettings] = useState<Settings| null>(null);
@@ -23,9 +25,15 @@ function SettingsPage() {
   const [fontSize, setFontSize] = useState<number>(16);
   const [partList, setPartList] = useState<String[]>([]);
 
-  const [page, setPage] = useState(0);
-  const rowsPerPage = 5 ;
   const [inputValue, setInputValue] = useState('');
+  const [snackPack, setSnackPack] = useState<readonly SnackbarMessage[]>([]);
+  const [open, setOpen] = useState(false);
+  const [messageInfo, setMessageInfo] = useState<SnackbarMessage | undefined>(
+    undefined,
+  );
+  
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
 
   const handleAdd = () => {
     const trimmed = inputValue.trim();
@@ -48,7 +56,10 @@ function SettingsPage() {
           console.log(data)
         })
         .catch((error) => {
-            console.error("Error fetching settings:", error);
+          console.error("Error fetching settings:", error); // throw out 
+          const message = "Error collecting settings: " + error;
+          const type = "warning";
+          setSnackPack((prev) => [...prev, { message, type, key: new Date().getTime() }]);
         });
             
   }, [])
@@ -59,7 +70,19 @@ function SettingsPage() {
       setFontSize(settings.font_size);
       setPartList(settings.part_list);
     }
-  }, [settings])
+  }, [settings]);
+
+  useEffect(() => {
+      if (snackPack.length && !messageInfo) {
+          // Set a new snack when we don't have an active one
+          setMessageInfo({ ...snackPack[0] });
+          setSnackPack((prev) => prev.slice(1));
+          setOpen(true);
+      } else if (snackPack.length && messageInfo && open) {
+          // Close an active snack when a new one is added
+          setOpen(false);
+      }
+  }, [snackPack, messageInfo, open]);
 
   const handleSave = () => {
     const newSettings = {
@@ -70,9 +93,15 @@ function SettingsPage() {
     invoke<Settings>('save_settings', { settings: newSettings })
         .then((data) => {
           console.log(data)
+          const message = "Success saving settings";
+          const type = "success";
+          setSnackPack((prev) => [...prev, { message, type, key: new Date().getTime() }]);
         })
         .catch((error) => {
             console.error("Error saving settings:", error);
+            const message = "Error saving settings: " + error;
+            const type = "warning";
+            setSnackPack((prev) => [...prev, { message, type, key: new Date().getTime() }]);
         });
   }
   
@@ -84,6 +113,9 @@ function SettingsPage() {
         })
         .catch((error) => {
             console.error("Error fetching settings:", error);
+            const message = "Error undoing settings: " + error;
+            const type = "warning";
+            setSnackPack((prev) => [...prev, { message, type, key: new Date().getTime() }]);
         });
   }
   
@@ -95,19 +127,7 @@ function SettingsPage() {
     setDarkMode(!darkMode);
   }
 
-  // const handleClick = () => {
-  //   const welcomeState = { orderNumber: orderNumber };
-  //   navigate('/main', {state: welcomeState} );
-  // }
-
-  // const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-  //   const welcomeState = { orderNumber: orderNumber };
-  //   if (event.key === "Enter" && orderNumValid) {
-  //     navigate('/main', {state: welcomeState} );
-  //   }
-
-  // };
-
+  
 
   return (
     <Layout>
@@ -119,7 +139,7 @@ function SettingsPage() {
           </Box>
           {/* Centered content */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '1em' }}>
-            <img src={pixusLogo} alt="Logo" style={{ height: '4em' }} />
+            <img src={isDarkMode ? darkLogo : lightLogo} alt="Logo" style={{ height: '4em' }} />
             <Typography variant="h4">Settings</Typography>
           </Box>
         </Box>
@@ -144,7 +164,7 @@ function SettingsPage() {
               />
             </Box>
           </Box>
-            <Paper elevation={1} sx={{ p: '1.5em', pb: '0.5em', maxWidth: '25em',  mx: 'auto' }}>
+            <Paper elevation={1} sx={{ p: '1.5em', pb: '0.5em', maxWidth: '25em',  mx: 'auto', minHeight: '28em' }}>
                 Labels to Omit
               {/* Add New Item */}
               <Box sx={{ display: 'flex', gap: '1em', mb: '1em' }}>
@@ -194,7 +214,7 @@ function SettingsPage() {
         </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: '1em', height: '100%', minHeight: '26em'}}>
-              <Typography> Loading orders </Typography>
+              <Typography> Loading settings </Typography>
               <CircularProgress />
           </Box>
         )}
@@ -219,6 +239,12 @@ function SettingsPage() {
         </Box>
 
       </Box>
+      <MyAlert
+          open={open}
+          setOpen={setOpen}
+          messageInfo={messageInfo}
+          setMessageInfo={setMessageInfo}
+      />
     </Layout>
   );
 }

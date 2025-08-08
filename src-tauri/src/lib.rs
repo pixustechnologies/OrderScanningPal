@@ -16,7 +16,7 @@ use std::env;
 use std::fs::{self, OpenOptions, File};
 use printers::{get_default_printer, get_printer_by_name};
 use dotenvy::dotenv;
-use tauri::{AppHandle, Manager, Emitter};
+use tauri::{AppHandle, Manager, Emitter, path::BaseDirectory};
 
 
 #[tauri::command]
@@ -152,7 +152,7 @@ WHERE   om.ORDNUM_10 = @P1
 }
 
 #[tauri::command]
-async fn get_print_items(order_number: String) -> Result<Vec<PrintOrder>, String> {
+async fn get_print_items(order_number: String, app_handle: AppHandle) -> Result<Vec<PrintOrder>, String> {
     let mut client = sql_setup().await?;
 
     let query =
@@ -184,10 +184,10 @@ ORDER BY wn.MAXID";
         .await
         .map_err(|e| format!("Query error: {}", e))?;
 
-    let mut orders = Vec::new();
+    let mut print_orders = Vec::new();
     
     // add BOM SNL and config sheet
-    orders.push(PrintOrder { // needs ASSN
+    print_orders.push(PrintOrder { // needs ASSN
         order_number: order_number.to_string(),
         part_number: "".to_string(),
         due_quantity: 1.0, 
@@ -195,7 +195,7 @@ ORDER BY wn.MAXID";
         print_type: "BOM".to_string(),
         notes: "Bill of Materials".to_string(),
     });
-    orders.push(PrintOrder { // needs PARTNUM for locating
+    print_orders.push(PrintOrder { // needs PARTNUM for locating
         order_number: order_number.to_string(),
         part_number: "".to_string(),
         due_quantity: 1.0, 
@@ -203,7 +203,7 @@ ORDER BY wn.MAXID";
         print_type: "Config".to_string(),
         notes: "Configuration Sheet (if found)".to_string(),
     });
-    orders.push(PrintOrder { // needs ORDNUM
+    print_orders.push(PrintOrder { // needs ORDNUM
         order_number: order_number.to_string(),
         part_number: "".to_string(),
         due_quantity: 1.0, 
@@ -212,7 +212,7 @@ ORDER BY wn.MAXID";
         notes: "Serial Number List".to_string(),
     });
     
-    let app_settings = load_settings()?;
+    let app_settings = load_settings(app_handle)?;
 
     while let Some(item) = stream.try_next().await.map_err(|e| format!("Row error: {}", e))? {
         if let Some(row) = item.into_row() {
@@ -228,13 +228,13 @@ ORDER BY wn.MAXID";
             if notes == Some("") || c == Some('~') || app_settings.part_list.contains(&pt) {
                 continue;
             } else if c == Some('?') { 
-                if let Some(last_order) = orders.last_mut() {
+                if let Some(last_order) = print_orders.last_mut() {
                     last_order.notes.push_str(
                         notes.expect("notes should have a value")
                     );
                 }
             } else {
-                orders.push(PrintOrder {
+                print_orders.push(PrintOrder {
                     order_number: order_number.map(|s| s.to_string()).expect("ordernumber should have a value"),
                     part_number: part_number.map(|s| s.to_string()).expect("part_number should have a value"),
                     due_quantity: due_quantity.expect("due_quantity should have a value"),
@@ -246,7 +246,7 @@ ORDER BY wn.MAXID";
         }
     }
 
-    Ok(orders)
+    Ok(print_orders)
 }
 
 async fn sql_setup() -> Result<Client<Compat<TcpStream>>, String> {
@@ -286,33 +286,35 @@ async fn sql_setup() -> Result<Client<Compat<TcpStream>>, String> {
 }
 
 #[tauri::command]
-async fn print(order: Order, print_order_row: PrintOrderRow, user: String, serial_number: String, reprint_run: bool) -> Result<String, String> {
-    let vc_exe_path = "C:\\Program Files (x86)\\Visual CUT 11\\Visual CUT.exe";
-    let word_exe_path = "C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE";
-    let pdf_exe_path = "C:\\CustomPrograms\\labelSerialNumberProject\\install\\PDFtoPrinter.exe";
+async fn print(order: Order, print_order_row: PrintOrderRow, user: String, serial_number: String, reprint_run: bool, app_handle: AppHandle) -> Result<String, String> {
+    let vc_exe_path = r"C:\Program Files (x86)\Visual CUT 11\Visual CUT.exe";
+    let word_exe_path = r"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE";
+    let pdf_exe_path = r"C:\CustomPrograms\labelSerialNumberProject\install\PDFtoPrinter.exe";
     let printer_name = "PXS-PRN-SHOP-BRTHR";
 
     let file_serial_number;
-    match get_serial_number().await {
+    match internal_get_serial_number(&app_handle).await {
         Ok(v) =>  file_serial_number = v,
         Err(e) => return Err(format!("Error reading file serial number: {}", e)),
     }
 
     if print_order_row.print_type == "BOM" {
-        let report_path = "\\\\pxsvsapp01\\eciShared\\Shop Order Processing\\BOMRPTv2.rpt";
+        let report_path = r"\\pxsvsapp01\eciShared\Shop Order Processing\BOMRPTv2.rpt";
         let status: ExitStatus;
         if order.part_number == order.assn_number {
             status = Command::new(vc_exe_path)
-                .arg(format!("-e {}", report_path))
+                .arg("-e")
+                .arg(report_path)
                 .arg(format!("Parm1:{}", order.assn_number))
-                .arg(format!("Printer_Only:{}", printer_name))
+                // .arg(format!("Printer_Only:{}", printer_name))
                 .status()
                 .map_err(|e| format!("Failed to execute process: {}", e))?;
         } else {
             status = Command::new(vc_exe_path)
-                .arg(format!("-e {}", report_path))
+                .arg("-e")
+                .arg(report_path)
                 .arg(format!("Parm1:{}:::{}", order.part_number, order.assn_number))
-                .arg(format!("Printer_Only:{}", printer_name))
+                // .arg(format!("Printer_Only:{}", printer_name))
                 .status()
                 .map_err(|e| format!("Failed to execute process: {}", e))?;
         }
@@ -583,8 +585,8 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
     
     
     if (print_order_row.print_type == "Final DOCS" || print_order_row.print_type.starts_with("94A") || print_order_row.print_type.starts_with("K94A")) && !reprint_run {
-        match serial_number_up(serial_number.clone(), file_serial_number.clone()) {
-            Ok(_a) =>   match serial_number_tracker(order.part_number.clone(), order.assn_number.clone(), serial_number.clone(), user.clone()) {
+        match serial_number_up(serial_number.clone(), file_serial_number.clone(), &app_handle) {
+            Ok(_a) =>   match serial_number_tracker(order.part_number.clone(), order.assn_number.clone(), serial_number.clone(), user.clone(), &app_handle) {
                                 Ok(_a) => Ok(format!("Success")),
                                 Err(e) => Err(format!("did not write to tracker: {} ", e)),
                             },
@@ -608,13 +610,25 @@ fn set_default_printer(printer_name: &str) -> std::io::Result<()> {
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Failed to set default printer"))
 }
 
-fn serial_number_tracker(part_number: String, assn_number: String, serial_number: String, user: String) -> Result<(), std::io::Error>{
+fn serial_number_tracker(part_number: String, assn_number: String, serial_number: String, user: String, app_handle: &AppHandle) -> Result<(), String>{
     // check if file exists and create it 
-    let path = "../documents/serialNumberTracker.txt";
-    if !fs::exists(path).expect("Can't check existence of serialNumberTracker") {
-        match create_serial_number_tracker(path) {
+    let doc_path;
+    let file_path;
+    if env!("DOC_PATH") == "build" {
+        file_path = app_handle
+            .path()
+            .resolve("serialNumberTracker.txt", BaseDirectory::AppData)
+            .map_err(|e| format!("Failed to resolve settings path: {}", e))?;
+
+
+    } else {
+        doc_path = env!("DOC_PATH");
+        file_path = PathBuf::from(doc_path).join("serialNumberTracker.txt");
+    }
+    if !fs::exists(&file_path).expect("Can't check existence of serialNumberTracker") {
+        match create_serial_number_tracker(&file_path) {
             Ok(_) => (),
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.to_string()),
          }
     }
 
@@ -622,7 +636,7 @@ fn serial_number_tracker(part_number: String, assn_number: String, serial_number
     let file = OpenOptions::new()
         .write(true)
         .append(true)
-        .open(path);
+        .open(&file_path);
 
     let local: DateTime<Local> = Local::now();
     let padded_date = format!("{: <12}", local.format("%Y-%m-%d"));
@@ -630,36 +644,81 @@ fn serial_number_tracker(part_number: String, assn_number: String, serial_number
     let padded_assn_number = format!("{: <30}", assn_number);
     let padded_serial_number = format!("{: <16}", serial_number);
 
-    if let Err(e) = writeln!(file?, "{}{}{}{}{}", padded_date,padded_part_number,padded_assn_number,padded_serial_number,user) {
+    if let Err(e) = writeln!(file.map_err(|e| format!("Failed to write to serial number tracker: {}", e))?, "{}{}{}{}{}", padded_date,padded_part_number,padded_assn_number,padded_serial_number,user) {
         eprintln!("Couldn't write to file: {}", e);
         // return Err(format!("Couldn't write to file: {}", e));
     }
     Ok(())
 }
 
-fn create_serial_number_tracker(path: &'static str) -> Result<(), std::io::Error>{
+fn create_serial_number_tracker(path: &PathBuf) -> Result<(), std::io::Error>{
     let mut file = File::create(path)?;
     let header = "Date        Model Number                  Part Number                   Serial Number   Initials \n";
     file.write_all(header.as_bytes())?;
     Ok(())
 }
 
-fn serial_number_up(serial_number: String, file_serial_number: String) -> Result<(), std::io::Error> {
+fn serial_number_up(serial_number: String, file_serial_number: String, app_handle: &AppHandle) -> Result<(), String> {
+    let doc_path;
+    let file_path;
+    if env!("DOC_PATH") == "build" {
+        file_path = app_handle
+            .path()
+            .resolve("SerialNumberCount.txt", BaseDirectory::AppData)
+            .map_err(|e| format!("Failed to resolve SerialNumberCount path: {}", e))?;
+
+
+    } else {
+        doc_path = env!("DOC_PATH");
+        file_path = PathBuf::from(doc_path).join("SerialNumberCount.txt");
+    }
     let fsnn = file_serial_number.parse::<i32>().unwrap();
     let snn = serial_number.parse::<i32>().unwrap() + 1;
     if snn > fsnn {
         let width = serial_number.len();
         let new_serial = format!("{:0width$}", snn, width = width);
 
-        let mut file = File::create("../documents/SerialNumberCount.txt")?;
-        file.write_all(new_serial.as_bytes())?;
+        let mut file = File::create(&file_path).map_err(|e| format!("Failed to create SerialNumberCount: {}", e))?;
+        
+        file.write_all(new_serial.as_bytes()).map_err(|e| format!("Failed to write to SerialNumberCount: {}", e))?;
     } 
     Ok(())
 }
 
+fn create_serial_number_count(path: &PathBuf) -> Result<(), std::io::Error> {
+    let mut file = File::create(path)?;
+    let start = "001010129";
+    file.write_all(start.as_bytes())?;
+    Ok(())
+}
+
 #[tauri::command]
-async fn get_serial_number() -> Result<String, &'static str> {
-    let mut serial_number_file = File::open("../documents/SerialNumberCount.txt")
+async fn get_serial_number(app_handle: AppHandle) -> Result<String, String> {
+    return internal_get_serial_number(&app_handle).await;
+}
+
+async fn internal_get_serial_number(app_handle: &AppHandle) -> Result<String, String> {
+    let doc_path;
+    let file_path;
+    if env!("DOC_PATH") == "build" {
+        file_path = app_handle
+            .path()
+            .resolve("SerialNumberCount.txt", BaseDirectory::AppData)
+            .map_err(|e| format!("Failed to resolve SerialNumberCount path: {}", e))?;
+
+
+    } else {
+        doc_path = env!("DOC_PATH");
+        file_path = PathBuf::from(doc_path).join("SerialNumberCount.txt");
+    }
+    if !fs::exists(&file_path).expect("Can't check existence of serialNumberCount") {
+        match create_serial_number_count(&file_path) {
+            Ok(_) => (),
+            Err(e) => return Err(e.to_string()),
+         }
+    }
+    
+    let mut serial_number_file = File::open(file_path)
         .map_err(|_| "Failed to open serial number file")?;
 
     let mut file_serial_number = String::new();
@@ -691,16 +750,29 @@ fn finder(root_dir: &str, search_term: String) -> Result<Vec<PathBuf>, String> {
 }
 
 #[tauri::command]
-fn save_settings(settings: Settings, app_handle: tauri::AppHandle) -> Result<(), String> {
-    let file_path = "../documents/appSettings.json";
+fn save_settings(settings: Settings, app_handle: AppHandle) -> Result<(), String> {
+    let doc_path;
+    let file_path;
+    if env!("DOC_PATH") == "build" {
+        file_path = app_handle
+            .path()
+            .resolve("appSettings.json", BaseDirectory::AppData)
+            .map_err(|e| format!("Failed to resolve settings path: {}", e))?;
+
+        // fs::create_dir_all(&app_data_path).map_err(|e| e.to_string())?;
+
+    } else {
+        doc_path = env!("DOC_PATH");
+        file_path = PathBuf::from(doc_path).join("appSettings.json");
+    }
     println!("dm{} fs{}", settings.dark_mode, settings.font_size);
     let json_string = serde_json::to_string_pretty(&settings)
         .map_err(|e| format!("Failed to serialize Settings to JSON: {}", e))?;
 
-    let mut file = File::create(file_path)
-        .map_err(|e| format!("Failed to create file {}: {}", file_path, e))?;
+    let mut file = File::create(&file_path)
+        .map_err(|e| format!("Failed to create file {}: {}", &file_path.display(), e))?;
     file.write_all(json_string.as_bytes())
-        .map_err(|e| format!("Failed to write to file {}: {}", file_path, e))?;
+        .map_err(|e| format!("Failed to write to file {}: {}", &file_path.display(), e))?;
 
     //update frontend
     app_handle
@@ -711,16 +783,27 @@ fn save_settings(settings: Settings, app_handle: tauri::AppHandle) -> Result<(),
 }
 
 #[tauri::command]
-fn load_settings() -> Result<Settings, String> {
-    let file_path = "../documents/appSettings.json";
-    if !fs::exists(file_path).expect("Can't check existence of appSettings") {
-        match create_app_settings(file_path) {
-            Ok(_) => (),
-            Err(e) => return Err(e.to_string()),
-         }
+fn load_settings(app_handle: AppHandle) -> Result<Settings, String> {
+    let doc_path;
+    let file_path;
+    if env!("DOC_PATH") == "build" {
+        file_path = app_handle
+            .path()
+            .resolve("appSettings.json", BaseDirectory::AppData)
+            .map_err(|e| format!("Failed to resolve settings path: {}", e))?;
+
+
+    } else {
+        doc_path = env!("DOC_PATH");
+        file_path = PathBuf::from(doc_path).join("appSettings.json");
     }
 
-    let file = File::open(file_path)
+
+    if !fs::exists(&file_path).expect("Can't check existence of appSettings") {
+        create_app_settings(&file_path).map_err(|e| format!("Failed to create app ettings: {}", e))?;
+    }
+
+    let file = File::open(&file_path)
         .map_err(|_| "Failed to open settings file")?;
     let reader = BufReader::new(file);
 
@@ -732,14 +815,18 @@ fn load_settings() -> Result<Settings, String> {
     Ok(settings)
 }
 
-fn create_app_settings(path: &'static str) -> Result<(), std::io::Error>{
+fn create_app_settings(path: &PathBuf) -> Result<(), std::io::Error>{
     let settings = Settings {
         font_size: 16,
-        dark_mode: true,
+        dark_mode: false,
         part_list: Vec::new(),
     };
     
     let json_string = serde_json::to_string_pretty(&settings)?;
+
+    if let Some(parent_dir) = path.parent() {
+        std::fs::create_dir_all(parent_dir)?;
+    }
 
     let mut file = File::create(path)?;
     file.write_all(json_string.as_bytes())?;

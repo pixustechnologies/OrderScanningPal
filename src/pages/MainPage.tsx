@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./../App.css";
-import {Box, Button, Card, TextField, Typography, Snackbar, SnackbarCloseReason, Alert, AlertColor, CircularProgress, Checkbox, } from "@mui/material";
+import {Box, Button, Card, TextField, Typography, CircularProgress, Checkbox, } from "@mui/material";
 import { DataGrid, GridColDef, GridRowSelectionModel  } from '@mui/x-data-grid';
 import Layout from './../Layout';
 import { useNavigate, useLocation } from "react-router-dom";
 import confetti from 'canvas-confetti';
+import MyAlert, { SnackbarMessage } from "../components/MyAlert";
 
 
 type Order = {
@@ -28,12 +29,6 @@ type PrintOrderRow = {
     id: number;
     print_type: string;
     notes: string;
-};
-
-type SnackbarMessage = {
-  message: string;
-  type: AlertColor;
-  key: number;
 };
 
 function MainPage() {
@@ -166,11 +161,17 @@ function MainPage() {
     }
 
     const handleSerialNumberDown = () => {
-        setSerialNumber('0'+(parseInt(serialNumber)-1).toString());
+        const originalLength = serialNumber.length;
+        const number = parseInt(serialNumber, 10) - 1;
+        const newSerial = number.toString().padStart(originalLength, '0');
+        setSerialNumber(newSerial);
     }
 
     const handleSerialNumberUp = () => {
-        setSerialNumber('0'+(parseInt(serialNumber)+1).toString());
+        const originalLength = serialNumber.length;
+        const number = parseInt(serialNumber, 10) + 1;
+        const newSerial = number.toString().padStart(originalLength, '0');
+        setSerialNumber(newSerial);
     }
 
     const handlePrint = () => {
@@ -295,19 +296,6 @@ function MainPage() {
         }
     }, [snackPack, messageInfo, open]);
 
-    const handleClose = (
-        _event: React.SyntheticEvent | Event,
-        reason?: SnackbarCloseReason,
-    ) => {
-        if (reason === 'clickaway') {
-        return;
-        }
-        setOpen(false);
-    };
-        
-    const handleExited = () => {
-        setMessageInfo(undefined);
-    };
 
     const columns: GridColDef[] = [
         { field: 'print_type', headerName: 'Print Type', width: 170 },
@@ -524,26 +512,15 @@ function MainPage() {
                 </Box>
       
             </Box>
-            <Snackbar
-                key={messageInfo ? messageInfo.key : undefined}
+            <MyAlert
                 open={open}
-                autoHideDuration={5000}
-                onClose={handleClose}
-                slotProps={{ transition: { onExited: handleExited } }}
-                // action={action}
-            >
-                <Alert
-                    onClose={handleClose}
-                    severity={messageInfo ? messageInfo.type : "info"}
-                    variant="filled"
-                    sx={{ width: '100%' }}
-                >
-                {messageInfo ? messageInfo.message : undefined}
-                </Alert>
-            </Snackbar>
+                setOpen={setOpen}
+                messageInfo={messageInfo}
+                setMessageInfo={setMessageInfo}
+            />
         </>
         ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: '1em', height: '100%', minHeight: '35em'}}>
+            <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: '1em', height: '100%', minHeight: '38em'}}>
                 <Typography> Loading your order </Typography>
                 <CircularProgress />
                 
