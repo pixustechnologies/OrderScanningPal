@@ -9,20 +9,17 @@ use futures::TryStreamExt;
 use walkdir::WalkDir;
 use chrono::prelude::*;
 use std::process::{Command, ExitStatus};
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::env;
 use std::fs::{self, OpenOptions, File};
-use printers::{get_default_printer, get_printer_by_name};
+use printers::{get_default_printer, get_printer_by_name, get_printers};
 use dotenvy::dotenv;
 use tauri::{AppHandle, Manager, Emitter, path::BaseDirectory};
+use std::ptr::null_mut;
 
-
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
 
 #[derive(Serialize, Deserialize)]
 struct Order {
@@ -68,7 +65,7 @@ async fn get_orders() -> Result<Vec<Order>, String> {
         END AS ASSPRT
 FROM    Requirement_Detail rd, Order_Master om, Product_Structure ps, Part_Master pm
 WHERE   om.ORDNUM_10 = rd.ORDNUM_11
-        AND LEFT(om.ORDNUM_10, 1) = '5'
+        AND (LEFT(om.ORDNUM_10, 1) = '5' OR LEFT(om.ORDNUM_10, 1) = '7')
         AND om.DUEQTY_10 > 0 
         AND om.PLANID_10 != '000' 
         AND pm.PRTNUM_01 = ps.COMPRT_02
@@ -116,7 +113,7 @@ async fn get_order_number_info(order_number: String) -> Result<Vec<Order>, Strin
                                         ELSE om.PRTNUM_10
         END AS ASSPRT
 FROM    Requirement_Detail rd, Order_Master om, Product_Structure ps, Part_Master pm
-WHERE   om.ORDNUM_10 = @P1
+WHERE   (om.ORDNUM_10 = @P1 OR om.ORDER_10 = @P1)
         AND om.ORDNUM_10 = rd.ORDNUM_11
         AND om.DUEQTY_10 > 0 
         AND pm.PRTNUM_01 = ps.COMPRT_02
@@ -162,7 +159,7 @@ async fn get_print_items(order_number: String, app_handle: AppHandle) -> Result<
         END AS ASSPRT,
 rd.PRTNUM_11, wn.NOTES_61
 FROM    Requirement_Detail rd, Windows_Notes wn, Order_Master om, Product_Structure ps, Part_Master pm
-WHERE   om.ORDNUM_10 = @P1
+WHERE   (om.ORDNUM_10 = @P1 OR om.ORDER_10 = @P1)
         AND om.ORDNUM_10 = rd.ORDNUM_11
         AND wn.COMPRT_61 = rd.PRTNUM_11
         AND (LEFT(rd.PRTNUM_11, 3) = '94A'
@@ -290,13 +287,23 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
     let vc_exe_path = r"C:\Program Files (x86)\Visual CUT 11\Visual CUT.exe";
     let word_exe_path = r"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE";
     let pdf_exe_path = r"C:\CustomPrograms\labelSerialNumberProject\install\PDFtoPrinter.exe";
-    let printer_name = "PXS-PRN-SHOP-BRTHR";
+    let printer_name;
 
     let file_serial_number;
     match internal_get_serial_number(&app_handle).await {
         Ok(v) =>  file_serial_number = v,
         Err(e) => return Err(format!("Error reading file serial number: {}", e)),
     }
+
+    // for printer in get_printers() {
+    //     println!("{:?}", printer);
+    // }                  
+
+    match get_default_printer_wmic() {
+        Some(printer) => printer_name=printer,
+        None => printer_name="PXS-PRN-SHOP-BRTHR".to_string(),
+    }   
+    println!("Default Printer: {}", printer_name); 
 
     if print_order_row.print_type == "BOM" {
         let report_path = r"\\pxsvsapp01\eciShared\Shop Order Processing\BOMRPTv2.rpt";
@@ -305,32 +312,37 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
             status = Command::new(vc_exe_path)
                 .arg("-e")
                 .arg(report_path)
-                .arg(format!("Parm1:{}", order.assn_number))
-                // .arg(format!("Printer_Only:{}", printer_name))
+                .raw_arg(&format!("\"Parm1:{}\"", order.order_number))
+                .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
                 .status()
                 .map_err(|e| format!("Failed to execute process: {}", e))?;
         } else {
             status = Command::new(vc_exe_path)
                 .arg("-e")
                 .arg(report_path)
-                .arg(format!("Parm1:{}:::{}", order.part_number, order.assn_number))
-                // .arg(format!("Printer_Only:{}", printer_name))
+                .raw_arg(&format!("\"Parm1:{}:::{}\"",order.part_number, order.assn_number))
+                .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
                 .status()
                 .map_err(|e| format!("Failed to execute process: {}", e))?;
         }
         println!("Process exited with status: {}", status);
     } else if print_order_row.print_type == "Config" {
 
-        let search_path = "X:\\Projects\\Configuration Sheets";
+        let search_path = r"X:\Projects\Configuration Sheets";
         // search for config path
         match finder(search_path, order.part_number.clone()) {
             Ok(v) =>  
                 for path in v {
                     let status = Command::new(word_exe_path)
-                        .arg(format!("-e {} /q /n", path.display()))
-                        .arg("/mFilePrintDefault /mFileCloseOrExit /mFileExit ")
+                        .arg("-e")
+                        .arg(path.display().to_string())
+                        .arg("/q")
+                        .arg("/n")
+                        .arg("/mFilePrintDefault")
+                        .arg("/mFileCloseOrExit")
+                        .arg("/mFileExit")
                         .status()
-                        .map_err(|e| format!("Failed to execute process: {}", e))?;
+                        .map_err(|e| format!("Failed to execute Word: {}", e))?;
 
                     println!("Process exited with status: {}", status);
                     break;
@@ -346,10 +358,11 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
             report_path = "\\\\pxsvsapp01\\eciShared\\Shop Order Processing\\SerialNumberList_v2.rpt";
         }
         let status = Command::new(vc_exe_path)
-            .arg(format!("-e {}", report_path))
-            .arg(format!("Parm1:{}", order.order_number))
-            .arg(format!("Printer_Only:{}", printer_name))
-            .arg(format!("Print_Copies:{}", order.due_quantity))
+            .arg("-e")
+            .arg(report_path)
+            .raw_arg(&format!("\"Parm1:{}\"", order.order_number))
+            .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
+            .raw_arg(&format!("\"Print_Copies:{}\"", order.due_quantity))
             .status()
             .map_err(|e| format!("Failed to execute process: {}", e))?;
         println!("Process exited with status: {}", status);
@@ -390,32 +403,41 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
             match finder("\\\\pxsvsfs01\\Production\\Manufacturing Instructions\\Crystal Label Reports", report_name) {
                 Ok(v) =>
                     for path in v {
-                        for i in 0..(order.due_quantity  as i32) {
-                            let snn = serial_number.parse::<i32>().unwrap() + i;
-                            let width = serial_number.len();
-                            let new_serial = format!("{:0width$}", snn, width = width);
-                            let mut final_args: String = format!("Parm1:{} Parm2:{}", order.order_number, new_serial);
-                            if let Some(a) = parm1 {
-                                final_args = format!("{} Parm3:{}", final_args, a);
-                            }
-                            if let Some(a) = parm2 {
-                                final_args = format!("{} Parm4:{}", final_args, a);
-                            }
-                            if let Some(a) = parm3 {
-                                final_args = format!("{} Parm5:{}", final_args, a);
-                            }
-                            let status = Command::new(vc_exe_path)
-                                    .arg("-e")
-                                    .arg(format!("{}", path.display()))
-                                    .arg(format!("{}", final_args))
-                                    .arg(format!("Printer_Only:{}", printer_name))
-                                    .status()
-                                    .map_err(|e| format!("Failed to execute process: {}", e))?;
-                                if !status.success() {
-                                    return Err(format!("Process exited with non-zero status: {}", status));
-                                }
-                            println!("Process exited with status: {}", status);
+                        for i in 0..(order.due_quantity as i32) {
+                        let snn = serial_number.parse::<i32>().unwrap() + i;
+                        let width = serial_number.len();
+                        let new_serial = format!("{:0width$}", snn, width = width);
+
+                        let mut command = Command::new(vc_exe_path);
+                        command.arg("-e");
+                        command.arg(path.display().to_string());
+
+                        // Parm arguments
+                        command.arg(format!("Parm1:{}", order.order_number));
+                        command.arg(format!("Parm2:{}", new_serial));
+
+                        if let Some(a) = &parm1 {
+                            command.arg(format!("Parm3:{}", a));
                         }
+                        if let Some(a) = &parm2 {
+                            command.arg(format!("Parm4:{}", a));
+                        }
+                        if let Some(a) = &parm3 {
+                            command.arg(format!("Parm5:{}", a));
+                        }
+
+                        command.arg(format!("Printer_Only:{}", printer_name));
+
+                        let status = command
+                            .status()
+                            .map_err(|e| format!("Failed to execute process: {}", e))?;
+
+                        if !status.success() {
+                            return Err(format!("Process exited with non-zero status: {}", status));
+                        }
+
+                        println!("Printed serial: {} (exit: {})", new_serial, status);
+                    }
                         break;
                     },
                 Err(e) => println!("error finding file: {e:?}")
@@ -423,7 +445,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
             
         }
 
-    } else if print_order_row.print_type == "Initial DOCS" {
+    } else if print_order_row.print_type.to_lowercase() == "initial docs" {
         //parse notes
         let parts = print_order_row.notes.split("?");
         let collection: Vec<&str> = parts.collect();
@@ -435,9 +457,10 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
             printer_desc = "PXS-PRN-LEX-CLR".to_string();
         }
 
-        if search_path.starts_with("P:\\") {
-            search_path = format!("\\\\pxsvsfs01\\Production{}", &search_path[2..]);
-        }
+        if search_path.starts_with(r"P:\") {
+            search_path = format!(r"\\pxsvsfs01\Production{}", &search_path[2..]);
+        } // TODO swap all drives to correct format
+
         // serach for document
         match finder(&search_path.as_str(), report_name) {
             Ok(v) =>
@@ -452,13 +475,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                                 .arg(format!("{}", printer_desc))
                                 .status()
                                 .map_err(|e| format!("Failed to execute process: {}", e))?;
-                        } else if extension == "docx" {                        
-                            let default_printer_string: String = get_default_printer()
-                                .map(|p| p.name)
-                                .unwrap_or_else(|| "Unknown Printer".to_string());
-
-                            let default_printer: &str = &default_printer_string;
-
+                        } else if extension == "docx" {
                             let target_printer = printer_desc.as_str();
                             match get_printer_by_name(target_printer) {
                                 Some(_) => {
@@ -473,28 +490,37 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                             }
 
                             status = Command::new(word_exe_path)
-                                .arg(format!("-e {} /q /n", path.display()))
-                                .arg("/mFilePrintDefault /mFileCloseOrExit /mFileExit")
+                                .arg("-e")
+                                .arg(path.display().to_string())
+                                .arg("/q")
+                                .arg("/n")
+                                .arg("/mFilePrintDefault")
+                                .arg("/mFileCloseOrExit")
+                                .arg("/mFileExit")
                                 .status()
                                 .map_err(|e| format!("Failed to execute process: {}", e))?;
                             
-                            match set_default_printer(default_printer) {
-                                Ok(_) => println!("Successfully set '{}' as default printer.", default_printer),
+                            match set_default_printer(printer_name.as_str()) {
+                                Ok(_) => println!("Successfully set '{}' as default printer.", printer_name),
                                 Err(e) => eprintln!("Failed to set default printer: {:?}", e),
                             }
 
                         } else if extension == "xlsx" { 
-                            status = Command::new("powershell -command")
-                                .arg(format!("start-process -filepath '{}' -verb print", path.display()))
+                            status = Command::new("powershell")
+                                .arg("-Command")
+                                .arg(format!(
+                                    "Start-Process -FilePath '{}' -Verb Print",
+                                    path.display()
+                                ))
                                 .status()
                                 .map_err(|e| format!("Failed to execute process: {}", e))?;
                             
                         } else if extension == "jpg" || extension == "png" {
-                            status = Command::new("powershell -command")
-                                .arg(format!("mspaint /p '{}'", path.display()))
+                            status = Command::new("mspaint.exe")
+                                .arg("/p")
+                                .arg(path.display().to_string())
                                 .status()
                                 .map_err(|e| format!("Failed to execute process: {}", e))?;
-                            
                         } else {
                             status = Command::new("")
                                 .status()
@@ -508,7 +534,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
 
             Err(e) => println!("error finding file: {e:?}")
         }
-    } else if print_order_row.print_type == "Final DOCS" {
+    } else if print_order_row.print_type.to_lowercase() == "final docs" {
         //parse notes
         let parts = print_order_row.notes.split("?");
         let collection: Vec<&str> = parts.collect();
@@ -534,9 +560,9 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                         let final_args: String = format!("Parm1:{} Parm2:{} Parm3:{}", order.order_number, serial_number, new_serial);
                         let status = Command::new(vc_exe_path)
                                 .arg("-e")
-                                .arg(format!("{}", path.display()))
-                                .arg(format!("{}", final_args))
-                                .arg(format!("Printer_Only:{}", printer_name)) 
+                                .raw_arg(&format!("\"{}\"", path.display()))
+                                .raw_arg(&format!("\"{}\"", final_args))
+                                .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
                                 .status()
                                 .map_err(|e| format!("Failed to execute process: {}", e))?;
                         println!("Process exited with status: {}", status);
@@ -561,9 +587,9 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                         }
                         let status = Command::new(vc_exe_path)
                                 .arg("-e")
-                                .arg(format!("{}", path.display()))
-                                .arg(format!("{}", final_args))
-                                .arg(format!("Printer_Only:{}", printer_name))
+                                .raw_arg(&format!("\"{}\"", path.display()))
+                                .raw_arg(&format!("\"{}\"", final_args))
+                                .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
                                 .status()
                                 .map_err(|e| format!("Failed to execute process: {}", e))?;
                         println!("Process exited with status: {}", status);
@@ -609,6 +635,34 @@ fn set_default_printer(printer_name: &str) -> std::io::Result<()> {
         .then(|| ())
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Failed to set default printer"))
 }
+
+fn get_default_printer_wmic() -> Option<String> {
+    let output = Command::new("wmic")
+        .args(["printer", "get", "name,", "default"])
+        .output()
+        .expect("Failed to run wmic");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for line in stdout.lines() {
+        let line = line.trim();
+        if line.to_ascii_lowercase().starts_with("default") || line.is_empty() {
+            continue; // skip header or empty lines
+        }
+
+        if line.contains("TRUE") {
+            // Assume fixed columns: "TRUE    printer name..."
+            let parts: Vec<&str> = line.splitn(2, "TRUE").collect();
+            if parts.len() == 2 {
+                let printer_name = parts[1].trim();
+                return Some(printer_name.to_string());
+            }
+        }
+    }
+
+    None
+}
+
 
 fn serial_number_tracker(part_number: String, assn_number: String, serial_number: String, user: String, app_handle: &AppHandle) -> Result<(), String>{
     // check if file exists and create it 
@@ -839,7 +893,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
             get_order_number_info,
             get_print_items,
             print,

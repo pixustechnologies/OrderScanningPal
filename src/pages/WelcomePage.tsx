@@ -3,7 +3,7 @@ import lightLogo from "./../assets/PixusLogoHD.png";
 import darkLogo from "./../assets/PixusLogoHDDarkmode.png";
 import { invoke } from "@tauri-apps/api/core";
 import "./../App.css";
-import { Box, Button,  CircularProgress,  Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography, useTheme } from "@mui/material";
+import { Box, Button,  CircularProgress,  FormControlLabel,  FormGroup,  Paper, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography, useTheme } from "@mui/material";
 import Layout from './../Layout';
 import { useNavigate } from "react-router-dom";
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -18,14 +18,28 @@ type Order = {
 function WelcomePage() {
   const [orderNumber, setOrderNumber] = useState("");
 
-  const orderNumValid = orderNumber.length == 8;
+  const orderNumValid = orderNumber.length >= 8;
   const [orders, setOrders] = useState<Order[] | null>(null);
+  
+  const [ordersFiltered, setOrdersFiltered] = useState<Order[] | null>(null);
 
   const [page, setPage] = useState(0);
   const rowsPerPage = 5 ;
 
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
+
+  
+  const [check5000, setCheck5000] = useState<boolean>(true);
+  const [check7000, setCheck7000] = useState<boolean>(false);
+
+  const handleCheck5000 = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCheck5000(event.target.checked);
+  };
+  const handleCheck7000 = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCheck7000(event.target.checked);
+  };
+
 
 
   const navigate = useNavigate();
@@ -39,8 +53,22 @@ function WelcomePage() {
         .catch((error) => {
             console.error("Error fetching orders:", error);
         });
-            
   }, [])
+
+  useEffect(() => {
+    updateFilteredOrders();
+  }, [orders])
+
+  useEffect(() => {
+    updateFilteredOrders();
+  }, [check5000, check7000])
+
+  const updateFilteredOrders = () => {
+    if (orders){
+      const remainingOrders = orders.filter((order) => (order.order_number.startsWith("5") && check5000) || (order.order_number.startsWith("7") && check7000) );
+      setOrdersFiltered(remainingOrders);
+    }
+  }
 
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -79,47 +107,61 @@ function WelcomePage() {
           </Box>
           <SettingsIcon  onClick={handleSettings} sx={{ cursor: 'pointer', fontSize: '2em', marginLeft: '3em' }} />
         </Box>
-        
 
-
-        { orders ? (
-        <Box sx={{minHeight: '25em'}}> 
-          <Box sx={{ alignItems: 'center',  width: '30em'}}>
-            <TableContainer component={Paper}>
-                <Table>
-                    <TableHead>
-                    <TableRow>
-                        <TableCell>Order Number</TableCell>
-                        <TableCell>Part Number</TableCell>
-                    </TableRow>
-                    </TableHead>
-                    <TableBody>
-                    {orders.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((order, index) => (
-                        <TableRow 
-                          key={index}
-                          hover
-                          onClick={(_event) => handleTableClick(order.order_number)}
-                          role="checkbox"
-                          tabIndex={-1}
-                          sx={{ cursor: 'pointer' }}
-                        >
-                        <TableCell>{order.order_number}</TableCell>
-                        <TableCell>{order.part_number}</TableCell>
+        { ordersFiltered ? (
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'flex-start',
+              width: '100%' 
+            }}
+          >
+            {/* This Stack contains the Switches on the left */}
+            <Stack direction="column" spacing={2} sx={{ position: 'absolute', left: '10em', mt: '5em'}}>
+              <FormGroup>
+                <FormControlLabel control={<Switch checked={check5000} onChange={handleCheck5000} />} label="5000s" />
+                <FormControlLabel control={<Switch checked={check7000} onChange={handleCheck7000} />} label="7000s" />
+              </FormGroup>
+            </Stack>
+            <Box sx={{minHeight: '25em'}}> 
+              <Box sx={{ alignItems: 'center',  width: '30em'}}>
+                <TableContainer component={Paper}>
+                    <Table>
+                        <TableHead>
+                        <TableRow>
+                            <TableCell>Order Number</TableCell>
+                            <TableCell>Part Number</TableCell>
                         </TableRow>
-                    ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                        </TableHead>
+                        <TableBody>
+                        {ordersFiltered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((order, index) => (
+                            <TableRow 
+                              key={index}
+                              hover
+                              onClick={(_event) => handleTableClick(order.order_number)}
+                              role="checkbox"
+                              tabIndex={-1}
+                              sx={{ cursor: 'pointer' }}
+                            >
+                            <TableCell>{order.order_number}</TableCell>
+                            <TableCell>{order.part_number}</TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+              </Box>
+              <TablePagination
+                rowsPerPageOptions={[5]}
+                component="div"
+                count={ordersFiltered.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+              />
+            </Box>
           </Box>
-          <TablePagination
-            rowsPerPageOptions={[5]}
-            component="div"
-            count={orders.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-          />
-        </Box>
         
         ) : (
             <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: '0.5em', height: '100%', minHeight: '25em'}}>

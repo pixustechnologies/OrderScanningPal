@@ -76,12 +76,13 @@ function MainPage() {
     }, [])
 
     useEffect(() => {
-        if(location.state.orderNumber.length == 8) {
+        if(location.state.orderNumber.length >= 8) {
             invoke<Order[]>('get_order_number_info', { orderNumber: location.state.orderNumber })
                 .then((data) => {
                     // we assume only first bc only 'SHOULD' have 1 order
                     setOrder(trimOrderFields(data[0]));
                     setDueQuantity(data[0].due_quantity.toString());
+                    console.log(data)
                 })
                 .catch((error) => {
                     console.error("Error fetching order:", error);
@@ -180,7 +181,7 @@ function MainPage() {
                 order: {
                     order_number: location.state.orderNumber,
                     part_number: order?.part_number || "",
-                    due_quantity: order?.due_quantity || 0,
+                    due_quantity: parseInt(dueQuantity),
                     assn_number: order?.assn_number || ""
                 },
                 printOrderRow: {
@@ -459,7 +460,7 @@ function MainPage() {
                                     return isValid ? '' : 'invalid-row';
                                 } else if (params.row.print_type == "Final DOCS" || params.row.print_type == "INITIAL DOCS") {
                                     const valueToValidate = params.row.notes;
-                                    const isValid = /^[A-Z]:\\[^\\?]+(\?.+){1,2}$/.test(valueToValidate); // checks for 1 or 2 params
+                                    const isValid = /^[A-Z]:\\[^?]+(\?.+){1,2}$/.test(valueToValidate); // checks for 1 or 2 params
                                     return isValid ? '' : 'invalid-row';
                                 }
                                 return 'invalid-row';
