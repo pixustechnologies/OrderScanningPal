@@ -2553,6 +2553,7 @@ dependencies = [
  "dotenvy",
  "futures",
  "log",
+ "once_cell",
  "printers",
  "serde",
  "serde_json",

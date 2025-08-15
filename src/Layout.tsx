@@ -2,28 +2,23 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Paper } from '@mui/material';
 import { invoke } from '@tauri-apps/api/core';
+import { Settings } from './App';
 
-type Settings = {
-  font_size: number;
-  dark_mode: boolean;
-  part_list: String[];
-};
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const [settings, setSettings] = useState<Settings>({font_size: 16, dark_mode: false, part_list: []});
+  const [settings, setSettings] = useState<Settings>();
 
-
-    useEffect(() => {
-      invoke<Settings>('load_settings', { })
-          .then((data) => {
-            setSettings(data);
-            console.log(data)
-          })
-          .catch((error) => {
-              console.error("Error fetching settings:", error);
-          });
-              
-    }, [])
+  useEffect(() => {
+    invoke<Settings>('load_settings', { })
+        .then((data) => {
+          setSettings(data);
+          console.log(data)
+        })
+        .catch((error) => {
+            console.error("Error fetching settings:", error);
+        });
+            
+  }, [])
     
   return (
     <Box
@@ -33,7 +28,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         minHeight: '100vh',
         display: 'flex',
         padding: 2,
-        fontSize: `${settings.font_size}px`,
+        fontSize: `${settings?.font_size ?? 16}px`,
       }}
     >
       <Paper

@@ -18,8 +18,9 @@ use std::fs::{self, OpenOptions, File};
 use printers::{get_default_printer, get_printer_by_name, get_printers};
 use dotenvy::dotenv;
 use tauri::{AppHandle, Manager, Emitter, path::BaseDirectory};
-use std::ptr::null_mut;
+use once_cell::sync::OnceCell;
 
+static DEFAULT_PRINTER: OnceCell<String> = OnceCell::new();
 
 #[derive(Serialize, Deserialize)]
 struct Order {
@@ -51,6 +52,12 @@ struct Settings {
   font_size: i32,
   dark_mode: bool,
   part_list: Vec<String>,
+  clr_printer: String,
+  bom_path: String,
+  snl_path: String,
+  config_path: String,
+  label_path: String,
+  pdf_to_printer_path: String,
 }
 
 
@@ -286,7 +293,6 @@ async fn sql_setup() -> Result<Client<Compat<TcpStream>>, String> {
 async fn print(order: Order, print_order_row: PrintOrderRow, user: String, serial_number: String, reprint_run: bool, app_handle: AppHandle) -> Result<String, String> {
     let vc_exe_path = r"C:\Program Files (x86)\Visual CUT 11\Visual CUT.exe";
     let word_exe_path = r"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE";
-    let pdf_exe_path = r"C:\CustomPrograms\labelSerialNumberProject\install\PDFtoPrinter.exe";
     let printer_name;
 
     let file_serial_number;
@@ -294,24 +300,21 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
         Ok(v) =>  file_serial_number = v,
         Err(e) => return Err(format!("Error reading file serial number: {}", e)),
     }
-
-    // for printer in get_printers() {
-    //     println!("{:?}", printer);
-    // }                  
-
-    match get_default_printer_wmic() {
-        Some(printer) => printer_name=printer,
+ 
+    let app_settings = internal_load_settings(&app_handle)?;          
+    
+    match get_default_printer_cached() {
+        Some(printer) => printer_name=printer.to_string(),
         None => printer_name="PXS-PRN-SHOP-BRTHR".to_string(),
     }   
     println!("Default Printer: {}", printer_name); 
 
     if print_order_row.print_type == "BOM" {
-        let report_path = r"\\pxsvsapp01\eciShared\Shop Order Processing\BOMRPTv2.rpt";
         let status: ExitStatus;
         if order.part_number == order.assn_number {
             status = Command::new(vc_exe_path)
                 .arg("-e")
-                .arg(report_path)
+                .arg(app_settings.bom_path)
                 .raw_arg(&format!("\"Parm1:{}\"", order.order_number))
                 .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
                 .status()
@@ -319,7 +322,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
         } else {
             status = Command::new(vc_exe_path)
                 .arg("-e")
-                .arg(report_path)
+                .arg(app_settings.bom_path)
                 .raw_arg(&format!("\"Parm1:{}:::{}\"",order.part_number, order.assn_number))
                 .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
                 .status()
@@ -327,10 +330,8 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
         }
         println!("Process exited with status: {}", status);
     } else if print_order_row.print_type == "Config" {
-
-        let search_path = r"X:\Projects\Configuration Sheets";
         // search for config path
-        match finder(search_path, order.part_number.clone()) {
+        match finder(&app_settings.config_path, order.part_number.clone()) {
             Ok(v) =>  
                 for path in v {
                     let status = Command::new(word_exe_path)
@@ -351,15 +352,9 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
         }
 
     } else if print_order_row.print_type == "SNL" {
-        let report_path; 
-        if order.part_number == order.assn_number {
-            report_path = "\\\\pxsvsapp01\\eciShared\\Shop Order Processing\\SerialNumberList_v3.rpt";
-        } else {
-            report_path = "\\\\pxsvsapp01\\eciShared\\Shop Order Processing\\SerialNumberList_v2.rpt";
-        }
         let status = Command::new(vc_exe_path)
             .arg("-e")
-            .arg(report_path)
+            .arg(app_settings.snl_path)
             .raw_arg(&format!("\"Parm1:{}\"", order.order_number))
             .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
             .raw_arg(&format!("\"Print_Copies:{}\"", order.due_quantity))
@@ -400,7 +395,8 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                 return Err(error.to_string());
             }
             // get extension
-            match finder("\\\\pxsvsfs01\\Production\\Manufacturing Instructions\\Crystal Label Reports", report_name) {
+            
+            match finder(&app_settings.label_path, report_name) {
                 Ok(v) =>
                     for path in v {
                         for i in 0..(order.due_quantity as i32) {
@@ -454,7 +450,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
         let mut printer_desc = collection.get(2).map_or("", |v| v).to_string();
         
         if printer_desc.to_lowercase() == "clr" {
-            printer_desc = "PXS-PRN-LEX-CLR".to_string();
+            printer_desc = app_settings.clr_printer;
         }
 
         if search_path.starts_with(r"P:\") {
@@ -469,7 +465,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                         let extension = path.extension().unwrap();
                         let status: ExitStatus;
                         if extension == "pdf" { 
-                            status = Command::new(pdf_exe_path)
+                            status = Command::new(&app_settings.pdf_to_printer_path)
                                 .arg("/s")
                                 .arg(format!("{}", path.display()))
                                 .arg(format!("{}", printer_desc))
@@ -636,7 +632,8 @@ fn set_default_printer(printer_name: &str) -> std::io::Result<()> {
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Failed to set default printer"))
 }
 
-fn get_default_printer_wmic() -> Option<String> {
+fn fetch_default_printer_wmic() -> Option<String> {
+    println!("Loading default printer...");
     let output = Command::new("wmic")
         .args(["printer", "get", "name,", "default"])
         .output()
@@ -647,11 +644,11 @@ fn get_default_printer_wmic() -> Option<String> {
     for line in stdout.lines() {
         let line = line.trim();
         if line.to_ascii_lowercase().starts_with("default") || line.is_empty() {
-            continue; // skip header or empty lines
+            continue; // skip header
         }
 
         if line.contains("TRUE") {
-            // Assume fixed columns: "TRUE    printer name..."
+            // skip column TRUE
             let parts: Vec<&str> = line.splitn(2, "TRUE").collect();
             if parts.len() == 2 {
                 let printer_name = parts[1].trim();
@@ -661,6 +658,13 @@ fn get_default_printer_wmic() -> Option<String> {
     }
 
     None
+}
+
+fn get_default_printer_cached() -> Option<&'static str> {
+    DEFAULT_PRINTER
+        .get_or_init(|| fetch_default_printer_wmic().unwrap_or_else(|| "Unknown".to_string()))
+        .as_str()
+        .into()
 }
 
 
@@ -838,6 +842,10 @@ fn save_settings(settings: Settings, app_handle: AppHandle) -> Result<(), String
 
 #[tauri::command]
 fn load_settings(app_handle: AppHandle) -> Result<Settings, String> {
+    return internal_load_settings(&app_handle);
+}
+
+fn internal_load_settings(app_handle: &AppHandle) -> Result<Settings, String> {
     let doc_path;
     let file_path;
     if env!("DOC_PATH") == "build" {
@@ -874,7 +882,13 @@ fn create_app_settings(path: &PathBuf) -> Result<(), std::io::Error>{
         font_size: 16,
         dark_mode: false,
         part_list: Vec::new(),
-    };
+        clr_printer: "PXS-PRN-LEX-CLR".to_string(),
+        bom_path: "\\\\pxsvsapp01\\eciShared\\Shop Order Processing\\BOMRPTv2.rpt".to_string(),
+        snl_path: "\\\\pxsvsapp01\\eciShared\\Shop Order Processing\\SerialNumberList_v4.rpt".to_string(),
+        config_path: "X:\\Projects\\Configuration Sheets".to_string(), // this is a word path so no need
+        label_path: "\\\\pxsvsfs01\\Production\\Manufacturing Instructions\\Crystal Label Reports".to_string(),
+        pdf_to_printer_path: "C:\\Program Files (x86)\\PdftoPrinter".to_string(), 
+    }; // anything to do with visual cut needs to be \\pxsvsfs01, otherwise there will be issues
     
     let json_string = serde_json::to_string_pretty(&settings)?;
 

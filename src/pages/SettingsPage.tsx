@@ -10,20 +10,24 @@ import KeyboardBackspaceIcon from '@mui/icons-material/KeyboardBackspace';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import MyAlert, { SnackbarMessage } from "../components/MyAlert";
+import { Settings } from './../App';
 
-
-type Settings = {
-  font_size: number;
-  dark_mode: boolean;
-  part_list: String[];
-};
 
 // font size, avoid list, dark mode
 function SettingsPage() {
   const [settings, setSettings] = useState<Settings| null>(null);
-  const [darkMode, setDarkMode] = useState<boolean>(false);
-  const [fontSize, setFontSize] = useState<number>(16);
-  const [partList, setPartList] = useState<String[]>([]);
+  const [currentSettings, setCurrentSettings] = useState<Settings>({
+    dark_mode: false,
+    font_size: 16,
+    part_list: [],
+    clr_printer: '',
+    bom_path: '',
+    snl_path: '',
+    config_path: '',
+    label_path: '',
+    pdf_to_printer_path: '',
+  });
+  const [errors, setErrors] = useState<{ [key in keyof Settings]?: string }>({});
 
   const [inputValue, setInputValue] = useState('');
   const [snackPack, setSnackPack] = useState<readonly SnackbarMessage[]>([]);
@@ -38,13 +42,13 @@ function SettingsPage() {
   const handleAdd = () => {
     const trimmed = inputValue.trim();
     if (trimmed) {
-      setPartList((prev) => [...prev, trimmed]);
+      setCurrentSettings( prev => prev ? {...prev, part_list: [...prev.part_list, trimmed] } : prev)
       setInputValue('');
     }
   };
 
   const handleRemove = (index: number) => {
-    setPartList((prev) => prev.filter((_, i) => i !== index));
+    setCurrentSettings( prev => prev ? {...prev, part_list: prev.part_list.filter((_, i) => i !== index) } : prev)
   };
 
   const navigate = useNavigate();
@@ -66,9 +70,7 @@ function SettingsPage() {
 
   useEffect(() => {
     if (settings){
-      setDarkMode(settings.dark_mode);
-      setFontSize(settings.font_size);
-      setPartList(settings.part_list);
+      setCurrentSettings(settings);
     }
   }, [settings]);
 
@@ -85,12 +87,7 @@ function SettingsPage() {
   }, [snackPack, messageInfo, open]);
 
   const handleSave = () => {
-    const newSettings = {
-      dark_mode: darkMode,
-      font_size: fontSize,
-      part_list: partList,
-    }
-    invoke<Settings>('save_settings', { settings: newSettings })
+    invoke<Settings>('save_settings', { settings: currentSettings })
         .then((data) => {
           console.log(data)
           const message = "Success saving settings";
@@ -124,9 +121,19 @@ function SettingsPage() {
   }
 
   const handleDarkMode = () => {
-    setDarkMode(!darkMode);
+    setCurrentSettings(prev => prev ? { ...prev, dark_mode: !currentSettings.dark_mode } : prev);
   }
 
+  const handlePathChange = ( key: keyof Settings) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    const regex = /^\\\\.*$/; 
+    if (!regex.test(value)) {
+      setErrors(prev => ({ ...prev, [key]: "Path must start with the server" }));
+    } else {
+      setErrors(prev => ({ ...prev, [key]: "" }));
+    }
+    setSettings(prev => prev ? { ...prev, [key]: value } : prev);
+  };
   
 
   return (
@@ -147,24 +154,97 @@ function SettingsPage() {
         { settings ? (
         <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: '1em'}}>
           <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', gap: '1em'}}>
-            <Box>
-              Dark Mode
-              <Switch id="dark-mode-switch" checked={darkMode} onChange={handleDarkMode} /> 
+            <Box  sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center'}}>
+              <Typography> Dark Mode </Typography>
+              <Switch id="dark-mode-switch" checked={currentSettings.dark_mode} onChange={handleDarkMode} /> 
             </Box>
-            <Box sx={{p: '1em'}}>
+            <Box sx={{p: '0.5em'}}>
               <TextField 
                 id="font-size-textfield" 
                 label="Font Size" 
                 variant="outlined" 
                 autoComplete="off"
-                value={fontSize}
+                value={currentSettings.font_size}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                  setFontSize(parseInt(event.target.value));
+                  const value = parseInt(event.target.value);
+                  setCurrentSettings(prev => prev ? { ...prev, font_size: value } : prev);
+                }}
+              />
+            </Box>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="colour-printer-textfield" 
+                label="CLR Printer" 
+                variant="outlined" 
+                value={currentSettings.clr_printer}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                  setCurrentSettings(prev => prev ? { ...prev, clr_printer: event.target.value } : prev);
+                }}
+              />
+            </Box>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="PDF-to-printer-path-textfield" 
+                label="PDFtoPrinter Path" 
+                variant="outlined" 
+                value={currentSettings.pdf_to_printer_path}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                  setCurrentSettings(prev => prev ? { ...prev, pdf_to_printer_path: event.target.value } : prev);
                 }}
               />
             </Box>
           </Box>
-            <Paper elevation={1} sx={{ p: '1.5em', pb: '0.5em', maxWidth: '25em',  mx: 'auto', minHeight: '28em' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', gap: '1em'}}>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="bill-of-materials-textfield" 
+                label="BOM.rpt Path" 
+                variant="outlined" 
+                autoComplete="off"
+                value={currentSettings.bom_path}
+                onChange={handlePathChange('bom_path')}
+                helperText={errors.bom_path}
+                error={!!errors.bom_path}
+              />
+            </Box>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="serial=number-list-textfield" 
+                label="Serial Number List.rpt Path" 
+                variant="outlined" 
+                autoComplete="off"
+                value={currentSettings.snl_path}
+                onChange={handlePathChange('snl_path')}
+                helperText={errors.snl_path}
+                error={!!errors.snl_path}
+              />
+            </Box>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="configuration-sheet-textfield" 
+                label="Configuration Sheet Directory" 
+                variant="outlined" 
+                autoComplete="off"
+                value={currentSettings.config_path}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                  setCurrentSettings(prev => prev ? { ...prev, config_path: event.target.value } : prev);
+                }}
+              />
+            </Box>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="label-textfield" 
+                label="Label Directory" 
+                variant="outlined" 
+                autoComplete="off"
+                value={currentSettings.label_path}
+                onChange={handlePathChange('label_path')}
+                helperText={errors.label_path}
+                error={!!errors.label_path}
+              />
+            </Box>
+          </Box>
+          <Paper elevation={1} sx={{ p: '1.5em', pb: '0.5em', maxWidth: '25em',  mx: 'auto', minHeight: '28em' }}>
                 Labels to Omit
               {/* Add New Item */}
               <Box sx={{ display: 'flex', gap: '1em', mb: '1em' }}>
@@ -189,7 +269,7 @@ function SettingsPage() {
               {/* List Display */}
               <Box sx={{maxHeight: '18em', overflowY: 'auto'}}>
               <List>
-                {partList.map((item, index) => (
+                {currentSettings.part_list.map((item, index) => (
                   <ListItem key={index} >
                     <ListItemText primary={item} />
                     <ListItemSecondaryAction>
@@ -203,14 +283,14 @@ function SettingsPage() {
                     </ListItemSecondaryAction>
                   </ListItem>
                 ))}
-                {partList.length === 0 && (
+                {currentSettings.part_list.length === 0 && (
                   <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
                     No labels avoided.
                   </Typography>
                 )}
               </List>
               </Box>
-            </Paper>
+          </Paper>
         </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'center', gap: '1em', height: '100%', minHeight: '26em'}}>

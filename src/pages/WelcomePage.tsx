@@ -103,7 +103,7 @@ function WelcomePage() {
           {/* Centered content */}
             <img src={isDarkMode ? darkLogo : lightLogo} alt="Logo" style={{ height: '4em' }} />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5em', overflowY: 'auto' }}>
-            <Typography variant="h4">OrderScanningPal!</Typography>
+            <Typography variant="h4">OrderScanningPal</Typography>
           </Box>
           <SettingsIcon  onClick={handleSettings} sx={{ cursor: 'pointer', fontSize: '2em', marginLeft: '3em' }} />
         </Box>

@@ -7,10 +7,16 @@ import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
-type Settings = {
+export type Settings = {
   font_size: number;
   dark_mode: boolean;
   part_list: string[];
+  clr_printer: string;
+  bom_path: string;
+  snl_path: string;
+  config_path: string;
+  label_path: string;
+  pdf_to_printer_path: string;
 };
 
 export default function App() {

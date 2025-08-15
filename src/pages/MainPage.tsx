@@ -176,6 +176,7 @@ function MainPage() {
     }
 
     const handlePrint = () => {
+        let printSuccessCount = selectedOrders.length;
         for (const rowOrder of selectedOrders) {
             invoke<string>('print', { 
                 order: {
@@ -197,25 +198,28 @@ function MainPage() {
                     console.log("rust output", data);
                     const message = "success for " + rowOrder.print_type + " " + rowOrder.notes;
                     console.log(message);
-                    // const type = "success";
-                    // setSnackPack((prev) => [...prev, { message, type, key: new Date().getTime() }]);
+                    printSuccessCount--;
+                    if (printSuccessCount == 0) {
+                        const message = "Successful print";
+                        const type = "success";
+                        setSnackPack((prev) => [...prev, { message, type, key: new Date().getTime() }]);
+                        invoke<string>('get_serial_number', { } )
+                            .then((data) => {
+                                setSerialNumber(data);
+                            })
+                            .catch((error) => {
+                                console.error("Error getting serial numbers:", error);
+                            });
+                    }
 
                 })
                 .catch((error) => {
                     console.error("Error printing:", error);
-                    const message = "Error printing: " + error;
+                    const message = "Error printing: " + rowOrder?.print_type + " Error: " + error;
                     const type = "warning";
                     setSnackPack((prev) => [...prev, { message, type, key: new Date().getTime() }]);
                 });
         }
-        invoke<string>('get_serial_number', { } )
-            .then((data) => {
-                setSerialNumber(data);
-            })
-            .catch((error) => {
-                console.error("Error getting serial numbers:", error);
-            });
-        
         console.log(rowSelectionModel, selectedOrders);
         // navigate('/done');
     }
