@@ -176,7 +176,7 @@ function WelcomePage() {
             id="order-number" 
             label="Order Number" 
             variant="outlined" 
-            // autoComplete="off"
+            autoComplete="off"
             value={orderNumber}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setOrderNumber(event.target.value);

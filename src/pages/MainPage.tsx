@@ -109,7 +109,7 @@ function MainPage() {
     
 
     useEffect(() => {
-        if (serialNumber.endsWith("69")) {
+        if (serialNumber.endsWith("69") || (((parseInt(serialNumber) % 100) < 69) && (parseInt(serialNumber) % 100) + parseInt(dueQuantity) > 69 )) {
             fireConfetti();
         }
     }, [serialNumber])
@@ -488,7 +488,7 @@ function MainPage() {
                     <TextField  
                         id="name-textfield" 
                         label="Username" 
-                        // autoComplete="off"
+                        autoComplete="off"
                         variant="outlined" 
                         value={username}
                         onChange={(event: React.ChangeEvent<HTMLInputElement>) => {

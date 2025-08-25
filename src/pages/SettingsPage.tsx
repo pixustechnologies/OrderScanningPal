@@ -126,7 +126,13 @@ function SettingsPage() {
 
   const handlePathChange = ( key: keyof Settings) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
-    const regex = /^\\\\.*$/; 
+    let regex;
+    if (key == 'label_path') {
+      regex = /^\\\\.+$/; 
+    } else {
+      regex = /^\\\\.+.RPT$/; 
+    }
+    // const regex = /^\\\\.*$/; 
     if (!regex.test(value)) {
       setErrors(prev => ({ ...prev, [key]: "Path must start with the server" }));
     } else {

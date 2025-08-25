@@ -305,9 +305,13 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
     
     match get_default_printer_cached() {
         Some(printer) => printer_name=printer.to_string(),
-        None => printer_name="PXS-PRN-SHOP-BRTHR".to_string(),
+        None => printer_name="Brother HL-2270DW series".to_string(),
     }   
     println!("Default Printer: {}", printer_name); 
+
+    // for p in get_printers() {
+    //     println!("{:?}", p);
+    // }
 
     if print_order_row.print_type == "BOM" {
         let status: ExitStatus;
@@ -389,7 +393,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
             } else if print_order_row.print_type == "94A000006-A01" {
                 printer_name = "\\\\PXSVSFS01\\125x25Zebra";
             } else if print_order_row.print_type == "94A000047-A01" {
-                printer_name = "\\\\PXSVSFS01\\"; // TODO
+                printer_name = "ZDesigner ZD621-203dpi ZPL";
             } else {
                 let error = "Could not match label to a printer";
                 return Err(error.to_string());
@@ -409,20 +413,20 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                         command.arg(path.display().to_string());
 
                         // Parm arguments
-                        command.arg(format!("Parm1:{}", order.order_number));
-                        command.arg(format!("Parm2:{}", new_serial));
+                        command.raw_arg(&format!("\"Parm1:{}\"", order.order_number));
+                        command.raw_arg(&format!("\"Parm2:{}\"", new_serial));
 
                         if let Some(a) = &parm1 {
-                            command.arg(format!("Parm3:{}", a));
+                            command.raw_arg(&format!("\"Parm3:{}\"", a));
                         }
                         if let Some(a) = &parm2 {
-                            command.arg(format!("Parm4:{}", a));
+                            command.raw_arg(&format!("\"Parm4:{}\"", a));
                         }
                         if let Some(a) = &parm3 {
-                            command.arg(format!("Parm5:{}", a));
+                            command.raw_arg(&format!("\"Parm5:{}\"", a));
                         }
 
-                        command.arg(format!("Printer_Only:{}", printer_name));
+                        command.raw_arg(&format!("\"Printer_Only:{}\"", printer_name));
 
                         let status = command
                             .status()
@@ -447,21 +451,21 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
         let collection: Vec<&str> = parts.collect();
         let mut search_path = collection.get(0).unwrap().to_string();
         let report_name = collection.get(1).unwrap().to_string();
-        let mut printer_desc = collection.get(2).map_or("", |v| v).to_string();
+        let mut printer_desc = collection.get(2).map_or(printer_name.clone(), |v| v.to_string());
+        
         
         if printer_desc.to_lowercase() == "clr" {
             printer_desc = app_settings.clr_printer;
         }
 
-        if search_path.starts_with(r"P:\") {
-            search_path = format!(r"\\pxsvsfs01\Production{}", &search_path[2..]);
-        } // TODO swap all drives to correct format
+        search_path = swap_drive(search_path);
 
         // serach for document
         match finder(&search_path.as_str(), report_name) {
             Ok(v) =>
                 for path in v {
-                    for _i in 0..(order.due_quantity  as i32) {
+                    // for _i in 0..(order.due_quantity  as i32) {
+                    // only print initial docs once, per run
                         let extension = path.extension().unwrap();
                         let status: ExitStatus;
                         if extension == "pdf" { 
@@ -471,7 +475,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                                 .arg(format!("{}", printer_desc))
                                 .status()
                                 .map_err(|e| format!("Failed to execute process: {}", e))?;
-                        } else if extension == "docx" {
+                        } else if extension == "docx" || extension == "doc" {
                             let target_printer = printer_desc.as_str();
                             match get_printer_by_name(target_printer) {
                                 Some(_) => {
@@ -482,6 +486,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                                 }
                                 None => {
                                     println!("Printer '{}' not found.", target_printer);
+                                    return Err(format!("Printer '{}' not found.", target_printer));
                                 }
                             }
 
@@ -501,7 +506,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                                 Err(e) => eprintln!("Failed to set default printer: {:?}", e),
                             }
 
-                        } else if extension == "xlsx" { 
+                        } else if extension == "xlsx" || extension == "xls" { 
                             status = Command::new("powershell")
                                 .arg("-Command")
                                 .arg(format!(
@@ -524,7 +529,7 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                         }
 
                         println!("Process exited with status: {}", status);
-                    }
+                    // }
                     break;
                 },
 
@@ -541,9 +546,8 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
         let parm3 = collection.get(4);
         let parm4 = collection.get(5);
 
-        if search_path.starts_with("P:\\") {
-            search_path = format!("\\\\pxsvsfs01\\Production{}", &search_path[2..]);
-        }
+        search_path = swap_drive(search_path);
+
         // serach for document
         match finder(&search_path.as_str(), report_name.clone()) {
             Ok(v) =>
@@ -553,11 +557,12 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                         let snn = serial_number.parse::<i32>().unwrap() + (order.due_quantity as i32);
                         let width = serial_number.len();
                         let new_serial = format!("{:0width$}", snn, width = width);
-                        let final_args: String = format!("Parm1:{} Parm2:{} Parm3:{}", order.order_number, serial_number, new_serial);
                         let status = Command::new(vc_exe_path)
                                 .arg("-e")
-                                .raw_arg(&format!("\"{}\"", path.display()))
-                                .raw_arg(&format!("\"{}\"", final_args))
+                                .arg(path.display().to_string())
+                                .raw_arg(&format!("\"Parm1:{}\"", order.order_number))
+                                .raw_arg(&format!("\"Parm2:{}\"", serial_number))
+                                .raw_arg(&format!("\"Parm3:{}\"", new_serial))
                                 .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
                                 .status()
                                 .map_err(|e| format!("Failed to execute process: {}", e))?;
@@ -568,27 +573,36 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
                         let snn = serial_number.parse::<i32>().unwrap() + i;
                         let width = serial_number.len();
                         let new_serial = format!("{:0width$}", snn, width = width);
-                        let mut final_args: String = format!("Parm1:{} Parm2:{}", order.order_number, new_serial);
-                        if let Some(a) = parm1 {
-                            final_args = format!("{} Parm3:{}", final_args, a);
+
+                        let mut command = Command::new(vc_exe_path);
+                        command.arg("-e");
+                        command.arg(path.display().to_string());
+
+                        // Parm arguments
+                        command.raw_arg(&format!("\"Parm1:{}\"", order.order_number));
+                        command.raw_arg(&format!("\"Parm2:{}\"", new_serial));
+
+                        if let Some(a) = &parm1 {
+                            command.raw_arg(&format!("\"Parm3:{}\"", a));
                         }
-                        if let Some(a) = parm2 {
-                            final_args = format!("{} Parm4:{}", final_args, a);
+                        if let Some(a) = &parm2 {
+                            command.raw_arg(&format!("\"Parm4:{}\"", a));
                         }
-                        if let Some(a) = parm3 {
-                            final_args = format!("{} Parm5:{}", final_args, a);
+                        if let Some(a) = &parm3 {
+                            command.raw_arg(&format!("\"Parm5:{}\"", a));
                         }
-                        if let Some(a) = parm4 {
-                            final_args = format!("{} Parm6:{}", final_args, a);
+
+                        command.raw_arg(&format!("\"Printer_Only:{}\"", printer_name));
+
+                        let status = command
+                            .status()
+                            .map_err(|e| format!("Failed to execute process: {}", e))?;
+
+                        if !status.success() {
+                            return Err(format!("Process exited with non-zero status: {}", status));
                         }
-                        let status = Command::new(vc_exe_path)
-                                .arg("-e")
-                                .raw_arg(&format!("\"{}\"", path.display()))
-                                .raw_arg(&format!("\"{}\"", final_args))
-                                .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
-                                .status()
-                                .map_err(|e| format!("Failed to execute process: {}", e))?;
-                        println!("Process exited with status: {}", status);
+
+                        println!("Printed serial: {} (exit: {})", new_serial, status);
                     }
                     break;
                 },
@@ -618,6 +632,24 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
         Ok(format!("Success"))
     }
     
+}
+
+fn swap_drive(drive_path: String) -> String {
+    if drive_path.starts_with("P:\\") {
+        format!("\\\\pxsvsfs01\\Production{}", &drive_path[2..])
+    } else if drive_path.starts_with("Q:\\") {
+        format!("\\\\pxsvsfs01\\Quality{}", &drive_path[2..])
+    } else if drive_path.starts_with("R:\\") {
+        format!("\\\\pxsvsfs01\\Purchasing{}", &drive_path[2..])
+    } else if drive_path.starts_with("S:\\") {
+        format!("\\\\pxsvsfs01\\Sales & Marketing{}", &drive_path[2..])
+    } else if drive_path.starts_with("X:\\") {
+        format!("\\\\pxsvsfs01\\UserData{}", &drive_path[2..])
+    } else if drive_path.starts_with("Y:\\") {
+        format!("\\\\pxsvsfs01\\Engineering{}", &drive_path[2..])
+    } else {
+        drive_path
+    }
 }
 
 fn set_default_printer(printer_name: &str) -> std::io::Result<()> {
@@ -887,7 +919,7 @@ fn create_app_settings(path: &PathBuf) -> Result<(), std::io::Error>{
         snl_path: "\\\\pxsvsapp01\\eciShared\\Shop Order Processing\\SerialNumberList_v4.rpt".to_string(),
         config_path: "X:\\Projects\\Configuration Sheets".to_string(), // this is a word path so no need
         label_path: "\\\\pxsvsfs01\\Production\\Manufacturing Instructions\\Crystal Label Reports".to_string(),
-        pdf_to_printer_path: "C:\\Program Files (x86)\\PdftoPrinter".to_string(), 
+        pdf_to_printer_path: "C:\\Program Files (x86)\\PdftoPrinter\\PDFtoPrinter.exe".to_string(), 
     }; // anything to do with visual cut needs to be \\pxsvsfs01, otherwise there will be issues
     
     let json_string = serde_json::to_string_pretty(&settings)?;
