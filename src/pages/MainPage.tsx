@@ -106,6 +106,16 @@ function MainPage() {
         }
     }, [location.state.orderNumber])
 
+    useEffect(() => {
+        if (order?.order_number?.startsWith("7")) {
+            setReprintRun(true);
+        }
+    }, [order]);
+
+    const handleReprintRunChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setReprintRun(event.target.checked);
+    };
+
     
 
     useEffect(() => {
@@ -477,10 +487,8 @@ function MainPage() {
                 <Box sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center', justifyContent: 'space-around', gap: '1em', p: '0.5em' }}> 
                     <Box >
                         <Checkbox sx={{ 'aria-label': 'Checkbox demo' }} 
-                            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                                setReprintRun(event.target.checked);
-                            }}
-                            value={reprintRun}
+                            onChange={handleReprintRunChange}
+                            checked={reprintRun}
                             disabled={selectedOrders.filter((order) => order.id > 3 && order.print_type != "INITIAL DOCS").length == 0} // if no labels/final docs selected disable
                         />
                         Reprint Run

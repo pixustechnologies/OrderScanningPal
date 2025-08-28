@@ -294,12 +294,6 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
     let vc_exe_path = r"C:\Program Files (x86)\Visual CUT 11\Visual CUT.exe";
     let word_exe_path = r"C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE";
     let printer_name;
-
-    let file_serial_number;
-    match internal_get_serial_number(&app_handle).await {
-        Ok(v) =>  file_serial_number = v,
-        Err(e) => return Err(format!("Error reading file serial number: {}", e)),
-    }
  
     let app_settings = internal_load_settings(&app_handle)?;          
     
@@ -609,28 +603,31 @@ async fn print(order: Order, print_order_row: PrintOrderRow, user: String, seria
             Err(e) => println!("error finding file: {e:?}")
         }
     } else {
-        // let output = format!("print success {}", order_number);
-        let output = "Print did not match any printing option";
-        // Ok(())
+        let output = format!("print did not match any printing option; {}", print_order_row.print_type);
         return Err(output.to_string());
     }
     
-    //TODO:
-    //deal with blog?
-    // 075
     
     
     if (print_order_row.print_type == "Final DOCS" || print_order_row.print_type.starts_with("94A") || print_order_row.print_type.starts_with("K94A")) && !reprint_run {
-        match serial_number_up(serial_number.clone(), file_serial_number.clone(), &app_handle) {
-            Ok(_a) =>   match serial_number_tracker(order.part_number.clone(), order.assn_number.clone(), serial_number.clone(), user.clone(), &app_handle) {
-                                Ok(_a) => Ok(format!("Success")),
-                                Err(e) => Err(format!("did not write to tracker: {} ", e)),
-                            },
-            Err(e) => Err(format!("did not count sn up: {} ", e)),
+        let snn = serial_number.parse::<i32>().unwrap() + (order.due_quantity as i32);
+        let width = serial_number.len();
+        let new_serial = format!("{:0width$}", snn, width = width);
+        match serial_number_up(new_serial, &app_handle).await {
+            Ok(_) => println!("sn up success"),
+            Err(e) => return Err(format!("did not count sn up: {}", e)),
         }
-    } else {
-        Ok(format!("Success"))
-    }
+        for i in 0..(order.due_quantity  as i32) {
+            let snn = serial_number.parse::<i32>().unwrap() + i;
+            let width = serial_number.len();
+            let new_serial = format!("{:0width$}", snn, width = width);
+            match serial_number_tracker(order.part_number.clone(), order.assn_number.clone(), new_serial, user.clone(), &app_handle) {
+                Ok(_) => println!("sn tracker success"),
+                Err(e) => return Err(format!("did not write to tracker: {}", e)),
+            }
+        }
+    } 
+    Ok(format!("Success"))
     
 }
 
@@ -748,7 +745,7 @@ fn create_serial_number_tracker(path: &PathBuf) -> Result<(), std::io::Error>{
     Ok(())
 }
 
-fn serial_number_up(serial_number: String, file_serial_number: String, app_handle: &AppHandle) -> Result<(), String> {
+async fn serial_number_up(serial_number: String,  app_handle: &AppHandle) -> Result<(), String> {
     let doc_path;
     let file_path;
     if env!("DOC_PATH") == "build" {
@@ -762,8 +759,13 @@ fn serial_number_up(serial_number: String, file_serial_number: String, app_handl
         doc_path = env!("DOC_PATH");
         file_path = PathBuf::from(doc_path).join("SerialNumberCount.txt");
     }
+    let file_serial_number;
+    match internal_get_serial_number(&app_handle).await {
+        Ok(v) =>  file_serial_number = v,
+        Err(e) => return Err(format!("Error reading file serial number: {}", e)),
+    }
     let fsnn = file_serial_number.parse::<i32>().unwrap();
-    let snn = serial_number.parse::<i32>().unwrap() + 1;
+    let snn = serial_number.parse::<i32>().unwrap();
     if snn > fsnn {
         let width = serial_number.len();
         let new_serial = format!("{:0width$}", snn, width = width);
