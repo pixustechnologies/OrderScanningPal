@@ -57,6 +57,9 @@ otherwise, set to a folder location where you want the files to be, such as the 
    - On Windows, ensure the default printer is configured to the desired printer for your output.
    - Verify the printer settings in the Windows Control Panel under "Devices and Printers."
 
+6. **Set Up Microsoft Word**
+   - Open Microsoft Word, and ensure there is an account logged into, otherwise the application cannot print word docs.
+
 ## Key Notes
 - Ensure all dependencies (barcode software, `PDFtoPrinter`, and VC11) are installed and configured correctly before running the application.
 - Double-check the database credentials in the `.env.dev` or `.env.prod` files to avoid connection issues.
