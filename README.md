@@ -2,6 +2,21 @@
 
 This guide provides instructions for setting up and installing the OrderScanningPal application, including configuring the `.env` files and performing the necessary installation steps.
 
+## For Non-Technical Users
+
+### If you are updating;
+Open VS Code on the remote desktop, then find the Terminal, and run `npm run cory`
+
+This will grab the latest version from the web, and place the installer at `src-tauri/target/release/bundle`
+
+### If you don't have VS Code installed
+This means you have to
+- Download & Install Git
+- Download & Install VSCode
+- Open the terminal inside of VSCode and clone the repo (done from the homepage, the green button, then run 'git clone URL')
+
+Then follow the steps below
+
 ## Environment File Setup
 
 You need to configure the following `.env` files for your development and production environments:
@@ -29,8 +44,8 @@ Replace `your_database_host`, `your_database_port`, `your_database_user`, `your_
 
 ### DOC_PATH 
 Finally, add a DOC_PATH variable, 
-if you are in .prod, set to build
-otherwise, set to a folder location where you want the files to be, such as the Serial Number List, and the app settings.
+- .prod, set to "build"
+- .dev, set to a folder location where you want internal files to be, such as the Serial Number List, and the app settings.
 
 ## Installation Steps
 
@@ -58,9 +73,9 @@ otherwise, set to a folder location where you want the files to be, such as the 
    - Verify the printer settings in the Windows Control Panel under "Devices and Printers."
 
 6. **Set Up Microsoft Word**
-   - Open Microsoft Word, and ensure there is an account logged into, otherwise the application cannot print word docs.
+   - Open Microsoft Word, and ensure you can print normally, otherwise the application cannot print word docs.
 
 ## Key Notes
 - Ensure all dependencies (barcode software, `PDFtoPrinter`, and VC11) are installed and configured correctly before running the application.
 - Double-check the database credentials in the `.env.dev` or `.env.prod` files to avoid connection issues.
-- If printing issues occur, verify that you are signed into the database via VC11 and that the default printer is correctly set.
+- If printing issues occur, verify that you are signed into the database via VC11, signed into Word and that the default printer is correctly set.
