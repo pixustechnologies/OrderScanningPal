@@ -3,6 +3,27 @@
 version = 4
 
 [[package]]
+name = "OrderScanningPal"
+version = "1.0.1"
+dependencies = [
+ "chrono",
+ "dotenvy",
+ "futures",
+ "log",
+ "once_cell",
+ "printers",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "tiberius",
+ "tokio",
+ "tokio-util",
+ "walkdir",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2543,27 +2564,6 @@ checksum = "9aa2b01e1d916879f73a53d01d1d6cee68adbb31d6d9177a8cfce093cced1d50"
 dependencies = [
  "futures-core",
  "pin-project-lite",
-]
-
-[[package]]
-name = "orderscanningpal"
-version = "1.0.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "futures",
- "log",
- "once_cell",
- "printers",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "tiberius",
- "tokio",
- "tokio-util",
- "walkdir",
 ]
 
 [[package]]

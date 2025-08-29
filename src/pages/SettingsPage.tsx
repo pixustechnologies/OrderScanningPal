@@ -26,6 +26,11 @@ function SettingsPage() {
     config_path: '',
     label_path: '',
     pdf_to_printer_path: '',
+    label_printer_125_025: '',
+    label_printer_2_025: '',
+    label_printer_075_025: '',
+    label_printer_2_3: '',
+    label_printer_4_6: '',
   });
   const [errors, setErrors] = useState<{ [key in keyof Settings]?: string }>({});
 
@@ -73,6 +78,48 @@ function SettingsPage() {
       setCurrentSettings(settings);
     }
   }, [settings]);
+
+  useEffect(() => {
+  if (!currentSettings || currentSettings.bom_path === '') return; // if default values
+
+  (["bom_path", "snl_path", "label_path"] as (keyof Settings)[]).forEach((key) => {
+    const value = currentSettings[key];
+
+    if (typeof value === "string") {
+      let regex;
+      if (key == 'label_path') {
+        regex = /^\\\\[^\\].+$/; 
+      } else {
+        regex = /^\\\\[^\\].+.RPT$/i; 
+      }
+      
+      if (!regex.test(value)) {
+        console.log("my error:", value)
+        setErrors(prev => ({ ...prev, [key]: "Path must start with the server" }));
+      } else {
+        setErrors(prev => ({ ...prev, [key]: "" }));
+      }
+    }
+  });
+
+  (["clr_printer", "label_printer_125_025", "label_printer_2_025", "label_printer_075_025", "label_printer_2_3", "label_printer_4_6"] as (keyof Settings)[]).forEach((key) => {
+    const value = currentSettings[key];
+
+    invoke<boolean>('check_printer_regex', { printer: value })
+        .then((data) => {
+          if (data) {
+            setErrors(prev => ({ ...prev, [key]: "" }));
+          } else {
+            setErrors(prev => ({ ...prev, [key]: "Printer not recognized" }));
+          }
+        })
+        .catch((error) => {
+            console.error("Error regex printer:", error);
+        });
+  });
+
+
+}, [currentSettings]); 
 
   useEffect(() => {
       if (snackPack.length && !messageInfo) {
@@ -128,17 +175,35 @@ function SettingsPage() {
     const value = event.target.value;
     let regex;
     if (key == 'label_path') {
-      regex = /^\\\\.+$/; 
+      regex = /^\\\\[^\\].+$/; 
     } else {
-      regex = /^\\\\.+.RPT$/; 
+      regex = /^\\\\[^\\].+.RPT$/i; 
     }
-    // const regex = /^\\\\.*$/; 
+    
     if (!regex.test(value)) {
       setErrors(prev => ({ ...prev, [key]: "Path must start with the server" }));
     } else {
       setErrors(prev => ({ ...prev, [key]: "" }));
     }
-    setSettings(prev => prev ? { ...prev, [key]: value } : prev);
+    setCurrentSettings(prev => prev ? { ...prev, [key]: value } : prev);
+  };
+
+  const handlePrinterChange = (key: keyof Settings) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    
+    invoke<boolean>('check_printer_regex', { printer: value })
+        .then((data) => {
+          if (data) {
+            setErrors(prev => ({ ...prev, [key]: "" }));
+          } else {
+            setErrors(prev => ({ ...prev, [key]: "Printer not recognized" }));
+          }
+        })
+        .catch((error) => {
+            console.error("Error regex printer:", error);
+        });
+
+    setCurrentSettings(prev => prev ? { ...prev, [key]: value } : prev);
   };
   
 
@@ -183,9 +248,9 @@ function SettingsPage() {
                 label="CLR Printer" 
                 variant="outlined" 
                 value={currentSettings.clr_printer}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                  setCurrentSettings(prev => prev ? { ...prev, clr_printer: event.target.value } : prev);
-                }}
+                onChange={handlePrinterChange('clr_printer')}
+                helperText={errors.clr_printer}
+                error={!!errors.clr_printer}
               />
             </Box>
             <Box sx={{p: '0.5em'}}>
@@ -247,6 +312,68 @@ function SettingsPage() {
                 onChange={handlePathChange('label_path')}
                 helperText={errors.label_path}
                 error={!!errors.label_path}
+              />
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', gap: '1em'}}>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="1.25-by-0.25-textfield" 
+                label="1.25 by 0.25 Label Printer" 
+                variant="outlined" 
+                autoComplete="off"
+                value={currentSettings.label_printer_125_025}
+                onChange={handlePrinterChange('label_printer_125_025')}
+                helperText={errors.label_printer_125_025}
+                error={!!errors.label_printer_125_025}
+              />
+            </Box>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="2-by-0.25-textfield" 
+                label="2 by 0.25 Label Printer" 
+                variant="outlined" 
+                autoComplete="off"
+                value={currentSettings.label_printer_2_025}
+                onChange={handlePrinterChange('label_printer_2_025')}
+                helperText={errors.label_printer_2_025}
+                error={!!errors.label_printer_2_025}
+              />
+            </Box>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="2-by-3-textfield" 
+                label="2 by 3 Label Printer" 
+                variant="outlined" 
+                autoComplete="off"
+                value={currentSettings.label_printer_2_3}
+                onChange={handlePrinterChange('label_printer_2_3')}
+                helperText={errors.label_printer_2_3}
+                error={!!errors.label_printer_2_3}
+              />
+            </Box>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="0.75-by-0.25-textfield" 
+                label="0.75 by 0.25 Label Printer" 
+                variant="outlined" 
+                autoComplete="off"
+                value={currentSettings.label_printer_075_025}
+                onChange={handlePrinterChange('label_printer_075_025')}
+                helperText={errors.label_printer_075_025}
+                error={!!errors.label_printer_075_025}
+              />
+            </Box>
+            <Box sx={{p: '0.5em'}}>
+              <TextField 
+                id="4-by-6-textfield" 
+                label="4 by 6 Label Printer" 
+                variant="outlined" 
+                autoComplete="off"
+                value={currentSettings.label_printer_4_6}
+                onChange={handlePrinterChange('label_printer_4_6')}
+                helperText={errors.label_printer_4_6}
+                error={!!errors.label_printer_4_6}
               />
             </Box>
           </Box>

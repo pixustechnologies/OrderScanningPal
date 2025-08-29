@@ -17,6 +17,11 @@ export type Settings = {
   config_path: string;
   label_path: string;
   pdf_to_printer_path: string;
+  label_printer_125_025: string;
+  label_printer_2_025: string;
+  label_printer_075_025: string;
+  label_printer_2_3: string;
+  label_printer_4_6: string;
 };
 
 export default function App() {

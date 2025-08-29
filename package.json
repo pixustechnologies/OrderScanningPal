@@ -1,7 +1,7 @@
 {
   "name": "orderscanningpal",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri-dev": "cross-env APP_ENV=dev tauri dev",
-    "tauri-build": "cross-env APP_ENV=prod tauri build"
+    "tauri-build": "cross-env APP_ENV=prod tauri build",
+    "cory": "git pull && npm i && cross-env APP_ENV=prod tauri build"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
