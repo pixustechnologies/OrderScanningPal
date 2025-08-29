@@ -8,7 +8,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import confetti from 'canvas-confetti';
 import MyAlert, { SnackbarMessage } from "../components/MyAlert";
 
-
 type Order = {
   order_number: string;
   part_number: string;
@@ -48,12 +47,6 @@ function MainPage() {
   const [reprintRun, setReprintRun] = useState(Boolean);
   const navigate = useNavigate();
   const location = useLocation();
-
-  
-
-    // const [selectionModel, setSelectionModel] = useState<GridRowSelectionModel>([]);
-    
-    // console.log('selectionModel:', selectionModel);
 
     // // Access selected rows by filtering
     const selectedOrders = printOrderRows.filter((row) =>
@@ -318,14 +311,6 @@ function MainPage() {
             sortable: false,
             description: 'The note section of the BOM', 
         },
-        // {
-        //     field: 'fullName',
-        //     headerName: 'Full name',
-        //     description: 'This column has a value getter and is not sortable.',
-        //     sortable: false,
-        //     width: 160,
-        //     valueGetter: (value, row) => `${row.firstName || ''} ${row.lastName || ''}`,
-        // },
     ];
 
     const onChangePrintAmount = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -501,6 +486,11 @@ function MainPage() {
                         value={username}
                         onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                             setUsername(event.target.value);
+                        }}
+                        onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
+                            if (event.key === 'Enter') {
+                                handlePrint();
+                            }
                         }}
                         required
                     />

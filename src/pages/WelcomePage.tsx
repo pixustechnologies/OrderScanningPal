@@ -100,7 +100,6 @@ function WelcomePage() {
     <Layout>
       <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: '1.75em'}}>
         <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, width: '100%', gap: '2em' }}>
-          {/* Centered content */}
             <img src={isDarkMode ? darkLogo : lightLogo} alt="Logo" style={{ height: '4em' }} />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '0.5em', overflowY: 'auto' }}>
             <Typography variant="h4">OrderScanningPal</Typography>
@@ -117,7 +116,6 @@ function WelcomePage() {
               width: '100%' 
             }}
           >
-            {/* This Stack contains the Switches on the left */}
             <Stack direction="column" spacing={2} sx={{ position: 'absolute', left: '10em', mt: '5em'}}>
               <FormGroup>
                 <FormControlLabel control={<Switch checked={check5000} onChange={handleCheck5000} />} label="5000s" />
@@ -194,9 +192,6 @@ function WelcomePage() {
             Continue
           </Button>
         </Box>
-        
-
-
 
       </Box>
     </Layout>
@@ -204,50 +199,3 @@ function WelcomePage() {
 }
 
 export default WelcomePage;
-
-
-
-
-
-
-
-        {/* <Box
-          component="img"
-          sx={{
-            height: 233,
-            width: 350,
-            maxHeight: { xs: 233, md: 167 },
-            maxWidth: { xs: 350, md: 250 },
-          }}
-          alt="The house from the offer."
-          src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&w=350&dpr=2"
-        /> */}
-      {/*  
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p> */}

@@ -76,50 +76,44 @@ function SettingsPage() {
   useEffect(() => {
     if (settings){
       setCurrentSettings(settings);
+
+      (["bom_path", "snl_path", "label_path"] as (keyof Settings)[]).forEach((key) => {
+        const value = settings[key];
+
+        if (typeof value === "string") {
+          let regex;
+          if (key == 'label_path') {
+            regex = /^\\\\[^\\].+$/; 
+          } else {
+            regex = /^\\\\[^\\].+.RPT$/i; 
+          }
+          
+          if (!regex.test(value)) {
+            console.log("my error:", value)
+            setErrors(prev => ({ ...prev, [key]: "Path must start with the server" }));
+          } else {
+            setErrors(prev => ({ ...prev, [key]: "" }));
+          }
+        }
+      });
+
+      (["clr_printer", "label_printer_125_025", "label_printer_2_025", "label_printer_075_025", "label_printer_2_3", "label_printer_4_6"] as (keyof Settings)[]).forEach((key) => {
+        const value = settings[key];
+
+        invoke<boolean>('check_printer_regex', { printer: value })
+            .then((data) => {
+              if (data) {
+                setErrors(prev => ({ ...prev, [key]: "" }));
+              } else {
+                setErrors(prev => ({ ...prev, [key]: "Printer not recognized" }));
+              }
+            })
+            .catch((error) => {
+                console.error("Error regex printer:", error);
+            });
+      });
     }
   }, [settings]);
-
-  useEffect(() => {
-  if (!currentSettings || currentSettings.bom_path === '') return; // if default values
-
-  (["bom_path", "snl_path", "label_path"] as (keyof Settings)[]).forEach((key) => {
-    const value = currentSettings[key];
-
-    if (typeof value === "string") {
-      let regex;
-      if (key == 'label_path') {
-        regex = /^\\\\[^\\].+$/; 
-      } else {
-        regex = /^\\\\[^\\].+.RPT$/i; 
-      }
-      
-      if (!regex.test(value)) {
-        console.log("my error:", value)
-        setErrors(prev => ({ ...prev, [key]: "Path must start with the server" }));
-      } else {
-        setErrors(prev => ({ ...prev, [key]: "" }));
-      }
-    }
-  });
-
-  (["clr_printer", "label_printer_125_025", "label_printer_2_025", "label_printer_075_025", "label_printer_2_3", "label_printer_4_6"] as (keyof Settings)[]).forEach((key) => {
-    const value = currentSettings[key];
-
-    invoke<boolean>('check_printer_regex', { printer: value })
-        .then((data) => {
-          if (data) {
-            setErrors(prev => ({ ...prev, [key]: "" }));
-          } else {
-            setErrors(prev => ({ ...prev, [key]: "Printer not recognized" }));
-          }
-        })
-        .catch((error) => {
-            console.error("Error regex printer:", error);
-        });
-  });
-
-
-}, [currentSettings]); 
 
   useEffect(() => {
       if (snackPack.length && !messageInfo) {
@@ -211,11 +205,9 @@ function SettingsPage() {
     <Layout>
       <Box sx={{ display: 'flex', flexDirection: 'column',  alignItems: 'center', justifyContent: 'space-between', height: '100%', gap: '2em'}}>
         <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '4em', width: '100%' }}>
-          {/* Settings icon aligned to the left */}
           <Box sx={{ position: 'absolute', left: 16 }}>
             <KeyboardBackspaceIcon onClick={handleBack} sx={{ cursor: 'pointer', fontSize: '2em' }} ></KeyboardBackspaceIcon>
           </Box>
-          {/* Centered content */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: '1em' }}>
             <img src={isDarkMode ? darkLogo : lightLogo} alt="Logo" style={{ height: '4em' }} />
             <Typography variant="h4">Settings</Typography>
@@ -399,7 +391,6 @@ function SettingsPage() {
 
               <Divider />
 
-              {/* List Display */}
               <Box sx={{maxHeight: '18em', overflowY: 'auto'}}>
               <List>
                 {currentSettings.part_list.map((item, index) => (

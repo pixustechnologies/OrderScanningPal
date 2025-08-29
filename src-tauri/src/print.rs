@@ -33,7 +33,7 @@ pub async fn print(order: Order, print_order_row: PrintOrderRow, user: String, s
             status = Command::new(vc_exe_path)
                 .arg("-e")
                 .arg(app_settings.bom_path)
-                .raw_arg(&format!("\"Parm1:{}\"", order.order_number))
+                .raw_arg(&format!("\"Parm1:{}\"", order.part_number))
                 .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
                 .status()
                 .map_err(|e| format!("Failed to execute process: {}", e))?;
@@ -98,15 +98,15 @@ pub async fn print(order: Order, print_order_row: PrintOrderRow, user: String, s
         // match to correct printer
         let printer_name;
         if print_order_row.print_type == "94A000003-A01" {
-            printer_name = "\\\\PXSVSFS01\\2x25ZEBRA";
+            printer_name =  &app_settings.label_printer_2_025;
         } else if print_order_row.print_type == "94A000004-A01" {
-            printer_name = "\\\\PXSVSFS01\\075x025_Zebra";
+            printer_name = &app_settings.label_printer_075_025;
         } else if print_order_row.print_type == "94A000005-A01" {
-            printer_name = "\\\\PXSVSFS01\\2x3ZEBRA";
+            printer_name = &app_settings.label_printer_2_3;
         } else if print_order_row.print_type == "94A000006-A01" {
-            printer_name = "\\\\PXSVSFS01\\125x25Zebra";
+            printer_name = &app_settings.label_printer_125_025;
         } else if print_order_row.print_type == "94A000047-A01" {
-            printer_name = "\\\\PXSVSFS01\\ZDesigner ZD621-203dpi ZPL";
+            printer_name = &app_settings.label_printer_4_6;
         } else {
             let error = "Could not match label to a printer";
             return Err(error.to_string());
@@ -441,9 +441,10 @@ pub async fn check_printer_regex(printer: String) -> Result<bool, String> {
 
     // gets list of printers available
     let counter = printer_list.iter().any(|p| {
-        // println!("{:?}", p);
-        p.name == printer
+        println!("{:?}", p.name);
+        p.name.to_ascii_lowercase() == printer.to_ascii_lowercase()
     });
+    println!("");
 
     Ok(counter)
 }
