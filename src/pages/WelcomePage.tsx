@@ -53,6 +53,14 @@ function WelcomePage() {
         .catch((error) => {
             console.error("Error fetching orders:", error);
         });
+    
+    invoke<String>('reset_serial_check', { })
+        .then((data) => {
+          console.log(data)
+        })
+        .catch((error) => {
+            console.error("Error resetting serial:", error);
+        });
   }, [])
 
   useEffect(() => {

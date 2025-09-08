@@ -4,13 +4,10 @@ Things to do further on the project
 
 ## High Priority
 
-Stock for 4x6 printer
 
 ## Medium Priority
 
 Add readme in app
-
-
 
 ## Low Priority
 

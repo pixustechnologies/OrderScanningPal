@@ -1,10 +1,9 @@
-use chrono::prelude::*;
 use std::path::PathBuf;
-use std::io::prelude::*;
+use std::io::{prelude::*, Write};
 use std::env;
 use std::fs::{self, OpenOptions, File};
 use tauri::{AppHandle, Manager, path::BaseDirectory};
-
+use chrono::{prelude::*, Datelike, Utc};
 
 pub fn serial_number_tracker(part_number: String, assn_number: String, serial_number: String, user: String, app_handle: &AppHandle) -> Result<(), String>{
     // check if file exists and create it 
@@ -128,4 +127,111 @@ async fn internal_get_serial_number(app_handle: &AppHandle) -> Result<String, St
         .map_err(|_| "Failed to read serial number file")?;
 
     Ok(file_serial_number)
+}
+
+const LAST_RESET_WEEK_FILE: &str = "last_reset_week.txt";
+
+#[tauri::command]
+pub async fn reset_serial_check(app_handle: AppHandle) -> Result<(), String> {
+    return handle_serial(&app_handle).await;
+}
+
+async fn handle_serial(app_handle: &AppHandle)  -> Result<(), String> {
+    let serial;
+    match internal_get_serial_number(&app_handle).await {
+        Ok(v) =>  serial = v,
+        Err(e) => return Err(e),
+    }
+
+    let now = Utc::now();
+    let current_week = format!("{}-{:02}", &now.iso_week().year(), &now.iso_week().week()); // 2025-36
+
+    let last_reset_week = get_weekly_reset_date(app_handle)
+        .map_err(|e| format!("Failed to get weekly reset date: {}", e))?;
+
+
+    if current_week != last_reset_week {
+        // reset serial_number
+        let doc_path = env!("DOC_PATH");
+        let file_path;
+        // if the DOC_PATH is build,  we navigate AppData, else go to the .env location
+        if doc_path == "build" {
+            file_path = app_handle
+                .path()
+                .resolve("SerialNumberCount.txt", BaseDirectory::AppData)
+                .map_err(|e| format!("Failed to resolve SerialNumberCount path: {}", e))?;
+        } else {
+            file_path = PathBuf::from(doc_path).join("SerialNumberCount.txt");
+        }
+        // CHECK IF WEEKLY OR IF YEARLY
+        let mut sn = serial.parse().unwrap_or(0);
+        let sn_string;
+        if current_week.chars().nth(3) == last_reset_week.chars().nth(3) { // weekly
+            sn = (sn/10000)+1;
+            sn_string = format!("{}0101", sn);
+        } else { // yearly
+            sn = (sn/1000000)+1;
+            sn_string = format!("{}010101", sn);
+        }
+        let width = serial.len();
+        let new_serial = format!("{:0>width$}", sn_string, width = width);
+
+        let mut file = File::create(&file_path).map_err(|e| format!("Failed to create SerialNumberCount: {}", e))?;  
+        file.write_all(new_serial.as_bytes()).map_err(|e| format!("Failed to write to SerialNumberCount: {}", e))?;
+
+        // now reset week value
+        let file_path_time;
+        // if the DOC_PATH is build,  we navigate AppData, else go to the .env location
+        if doc_path == "build" {
+            file_path_time = app_handle
+                .path()
+                .resolve(LAST_RESET_WEEK_FILE, BaseDirectory::AppData)
+                .map_err(|e| format!("Failed to resolve LAST_RESET_WEEK_FILE path: {}", e))?;
+        } else {
+            file_path_time = PathBuf::from(doc_path).join(LAST_RESET_WEEK_FILE);
+        }
+
+        let mut file_time = File::create(&file_path_time).map_err(|e| format!("Failed to create LAST_RESET_WEEK_FILE: {}", e))?;  
+        file_time.write_all(current_week.as_bytes()).map_err(|e| format!("Failed to write to LAST_RESET_WEEK_FILE: {}", e))?;
+    }
+
+    Ok(())
+}
+
+fn get_weekly_reset_date(app_handle: &AppHandle) -> Result<String, String> {
+    let doc_path = env!("DOC_PATH");
+    let file_path_week;
+    // if the DOC_PATH is build,  we navigate AppData, else go to the .env location
+    if env!("DOC_PATH") == "build" {
+        file_path_week = app_handle
+            .path()
+            .resolve(LAST_RESET_WEEK_FILE, BaseDirectory::AppData)
+            .map_err(|e| format!("Failed to resolve last_reset_week path: {}", e))?;
+    } else {
+        file_path_week = PathBuf::from(doc_path).join(LAST_RESET_WEEK_FILE);
+    }
+    if !fs::exists(&file_path_week).expect("Can't check existence of last_reset_week") {
+        match create_last_reset_week(&file_path_week) {
+            Ok(_) => (),
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    
+    let mut serial_number_file = File::open(file_path_week)
+        .map_err(|_| "Failed to open last_reset_week file")?;
+
+    let mut last_reset_week = String::new();
+    
+    serial_number_file
+        .read_to_string(&mut last_reset_week)
+        .map_err(|_| "Failed to read last_reset_week file")?;
+
+    Ok(last_reset_week)
+}
+
+fn create_last_reset_week(path: &PathBuf) -> Result<(), std::io::Error> {
+    let mut file = File::create(path)?;
+    let start = "2021-01";
+    file.write_all(start.as_bytes())?;
+    Ok(())
 }

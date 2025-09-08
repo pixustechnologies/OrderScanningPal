@@ -15,6 +15,7 @@ pub fn run() {
             print::print,
             print::check_printer_regex,
             serial_number_files::get_serial_number,
+            serial_number_files::reset_serial_check,
             settings::save_settings,
             settings::load_settings,
             ])
