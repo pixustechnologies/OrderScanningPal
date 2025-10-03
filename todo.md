@@ -16,3 +16,5 @@ Set up Brother Printer onto print server
 Comment Everything
 
 Move Swap_drives into settings
+
+Toggle Common Parts on print screen
