@@ -19,6 +19,7 @@ function SettingsPage() {
   const [currentSettings, setCurrentSettings] = useState<Settings>({
     dark_mode: false,
     font_size: 16,
+    common_parts: true,
     part_list: [],
     clr_printer: '',
     bom_path: '',
@@ -220,6 +221,13 @@ function SettingsPage() {
             <Box  sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center'}}>
               <Typography> Dark Mode </Typography>
               <Switch id="dark-mode-switch" checked={currentSettings.dark_mode} onChange={handleDarkMode} /> 
+            </Box>
+            <Box  sx={{ display: 'flex', flexDirection: 'row',  alignItems: 'center'}}>
+              <Typography>Common Parts</Typography>
+              <Switch id="common-parts-switch" checked={currentSettings.common_parts} 
+                onChange={() => {
+                    setCurrentSettings(prev => prev ? { ...prev, common_parts: !currentSettings.common_parts } : prev);
+                }} /> 
             </Box>
             <Box sx={{p: '0.5em'}}>
               <TextField 

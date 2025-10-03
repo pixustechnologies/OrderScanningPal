@@ -10,6 +10,7 @@ import { listen } from '@tauri-apps/api/event';
 export type Settings = {
   font_size: number;
   dark_mode: boolean;
+  common_parts: boolean;
   part_list: string[];
   clr_printer: string;
   bom_path: string;

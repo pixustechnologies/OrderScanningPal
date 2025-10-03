@@ -12,6 +12,7 @@ use tauri::{AppHandle, Manager, Emitter, path::BaseDirectory};
 pub struct Settings {
   font_size: i32,
   dark_mode: bool,
+  pub common_parts: bool,
   pub part_list: Vec<String>,
   pub clr_printer: String,
   pub bom_path: String,
@@ -99,6 +100,7 @@ fn create_app_settings(path: &PathBuf) -> Result<(), std::io::Error>{
     let settings = Settings {
         font_size: 16,
         dark_mode: false,
+        common_parts: true,
         part_list: Vec::new(),
         clr_printer: "\\\\PXSVSFS01\\PIXUS-Lexmark CS310 Series PS3".to_string(),
         bom_path: "\\\\pxsvsapp01\\eciShared\\Shop Order Processing\\BOMRPTv2.rpt".to_string(),

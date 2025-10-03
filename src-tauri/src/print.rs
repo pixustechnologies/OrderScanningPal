@@ -7,6 +7,7 @@ use tauri::{AppHandle};
 use once_cell::sync::OnceCell;
 use crate::settings;
 use crate::serial_number_files;
+use crate::sql;
 use crate::structs::{Order, PrintOrderRow};
 
 
@@ -28,24 +29,37 @@ pub async fn print(order: Order, print_order_row: PrintOrderRow, user: String, s
 
     //handle each type of print
     if print_order_row.print_type == "BOM" {
+        // call to SQL to check for more
+        let common_parts = sql::common_parts(order.order_number).await.unwrap_or_default();
         let status: ExitStatus;
-        if order.part_number == order.assn_number {
-            status = Command::new(vc_exe_path)
-                .arg("-e")
-                .arg(app_settings.bom_path)
-                .raw_arg(&format!("\"Parm1:{}\"", order.part_number))
-                .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
-                .status()
-                .map_err(|e| format!("Failed to execute process: {}", e))?;
+        let common_parts_str = common_parts
+            .iter()
+            .map(|s| s.trim())
+            .collect::<Vec<_>>()
+            .join(":::");
+
+        let parm1_arg = if order.part_number == order.assn_number {
+            format!("\"Parm1:{}\"", order.part_number)
         } else {
-            status = Command::new(vc_exe_path)
-                .arg("-e")
-                .arg(app_settings.bom_path)
-                .raw_arg(&format!("\"Parm1:{}:::{}\"",order.part_number, order.assn_number))
-                .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
-                .status()
-                .map_err(|e| format!("Failed to execute process: {}", e))?;
-        }
+            if common_parts_str.is_empty() || !app_settings.common_parts {
+                format!("\"Parm1:{}:::{}\"", order.part_number, order.assn_number)
+            } else {
+                // Append common parts after assn
+                format!(
+                    "\"Parm1:{}:::{}:::{}\"",
+                    order.part_number,
+                    order.assn_number,
+                    common_parts_str
+                )
+            }
+        };
+        status = Command::new(vc_exe_path)
+            .arg("-e")
+            .arg(app_settings.bom_path)
+            .raw_arg(&parm1_arg)
+            .raw_arg(&format!("\"Printer_Only:{}\"", printer_name))
+            .status()
+            .map_err(|e| format!("Failed to execute process: {}", e))?;
         println!("Process exited with status: {}", status);
     } else if print_order_row.print_type == "Config" {
         // search for config path

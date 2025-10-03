@@ -201,6 +201,46 @@ ORDER BY wn.MAXID";
     Ok(print_orders)
 }
 
+pub async fn common_parts(order_number: String) -> Result<Vec<String>, String> {
+    let mut client = sql_setup().await?;
+
+    let query =
+    "SELECT  om.ORDNUM_10, om.PRTNUM_10, om.DUEQTY_10, 
+        CASE pm2.TYPE_01 WHEN 'S'        THEN ps.COMPRT_02
+                                        ELSE om.PRTNUM_10
+        END AS ASSPRT,
+        CASE WHEN pm3.PMDES1_01  LIKE '%Standard Parts%'OR pm3 .PMDES1_01 LIKE '%Common Parts%' 	THEN pm3.PRTNUM_01
+        											ELSE pm2.PRTNUM_01
+     	END AS COMMONPART
+FROM   Order_Master om, Product_Structure ps, Part_Master pm, Part_Master pm2, Product_Structure ps2, Part_Master pm3
+WHERE   (om.ORDNUM_10 = @P1 OR om.ORDER_10 = @P1)
+        AND om.PRTNUM_10 = pm.PRTNUM_01 
+        AND om.DUEQTY_10 > 0 
+        AND pm.PRTNUM_01 = ps.PARPRT_02
+        AND ps.COMPRT_02 = pm2.PRTNUM_01
+        AND ps2.PARPRT_02 = ps.COMPRT_02
+        AND ps2.COMPRT_02 = pm3.PRTNUM_01
+        AND (pm2.PMDES1_01 LIKE '%Standard Parts%' OR pm2.PMDES1_01 LIKE '%Common Parts%' OR pm3.PMDES1_01 LIKE '%Standard Parts%' OR pm3.PMDES1_01 LIKE '%Common Parts%')
+
+ORDER BY om.ORDNUM_10 DESC";
+
+    let mut stream = client
+        .query(query, &[&order_number])
+        .await
+        .map_err(|e| format!("Query error: {}", e))?;
+
+    let mut common_parts = Vec::new();
+
+    while let Some(item) = stream.try_next().await.map_err(|e| format!("Row error: {}", e))? {
+        if let Some(row) = item.into_row() {
+            let common_part: Option<&str> = row.get(4);
+            common_parts.push(common_part.map(|s| s.to_string()).expect("common_part should have a value"));
+        }
+    }
+
+    Ok(common_parts)
+}
+
 async fn sql_setup() -> Result<Client<Compat<TcpStream>>, String> {
     //setup functcion for all SQL queries
     // getting information from the .env file
