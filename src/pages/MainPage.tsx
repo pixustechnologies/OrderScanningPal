@@ -109,14 +109,6 @@ function MainPage() {
         setReprintRun(event.target.checked);
     };
 
-    
-
-    useEffect(() => {
-        if (serialNumber.endsWith("69") || (((parseInt(serialNumber) % 100) < 69) && (parseInt(serialNumber) % 100) + parseInt(dueQuantity) > 69 )) {
-            fireConfetti();
-        }
-    }, [serialNumber])
-
     const fireConfetti = () => {
         confetti({
             particleCount: 500,
@@ -179,6 +171,9 @@ function MainPage() {
     }
 
     const handlePrint = () => {
+        if (serialNumber.endsWith("69") || (((parseInt(serialNumber) % 100) < 69) && (parseInt(serialNumber) % 100) + parseInt(dueQuantity) > 69 )) {
+            fireConfetti();
+        }
         let printSuccessCount = selectedOrders.length;
         for (const rowOrder of selectedOrders) {
             invoke<string>('print', { 

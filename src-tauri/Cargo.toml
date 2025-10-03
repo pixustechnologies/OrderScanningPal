@@ -1,6 +1,6 @@
 [package]
 name = "OrderScanningPal"
-version = "1.0.2"
+version = "1.0.3"
 description = "Pixus Label Printing App"
 authors = ["Jacob Scott"]
 edition = "2021"
