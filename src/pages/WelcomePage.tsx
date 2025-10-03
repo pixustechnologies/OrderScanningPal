@@ -30,14 +30,14 @@ function WelcomePage() {
   const isDarkMode = theme.palette.mode === 'dark';
 
   
-  const [check5000, setCheck5000] = useState<boolean>(true);
-  const [check7000, setCheck7000] = useState<boolean>(false);
+  const [check5xx, setCheck5xx] = useState<boolean>(true);
+  const [check7xx, setCheck7xx] = useState<boolean>(false);
 
-  const handleCheck5000 = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setCheck5000(event.target.checked);
+  const handleCheck5xx = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCheck5xx(event.target.checked);
   };
-  const handleCheck7000 = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setCheck7000(event.target.checked);
+  const handleCheck7xx = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCheck7xx(event.target.checked);
   };
 
 
@@ -69,11 +69,11 @@ function WelcomePage() {
 
   useEffect(() => {
     updateFilteredOrders();
-  }, [check5000, check7000])
+  }, [check5xx, check7xx])
 
   const updateFilteredOrders = () => {
     if (orders){
-      const remainingOrders = orders.filter((order) => (order.order_number.startsWith("5") && check5000) || (order.order_number.startsWith("7") && check7000) );
+      const remainingOrders = orders.filter((order) => (order.order_number.startsWith("5") && check5xx) || (order.order_number.startsWith("7") && check7xx) );
       setOrdersFiltered(remainingOrders);
     }
   }
@@ -126,8 +126,8 @@ function WelcomePage() {
           >
             <Stack direction="column" spacing={2} sx={{ position: 'absolute', left: '10em', mt: '5em'}}>
               <FormGroup>
-                <FormControlLabel control={<Switch checked={check5000} onChange={handleCheck5000} />} label="5000s" />
-                <FormControlLabel control={<Switch checked={check7000} onChange={handleCheck7000} />} label="7000s" />
+                <FormControlLabel control={<Switch checked={check5xx} onChange={handleCheck5xx} />} label="5xx's" />
+                <FormControlLabel control={<Switch checked={check7xx} onChange={handleCheck7xx} />} label="7xx's" />
               </FormGroup>
             </Stack>
             <Box sx={{minHeight: '25em'}}> 
