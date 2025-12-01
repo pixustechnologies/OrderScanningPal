@@ -10,6 +10,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 
 type Order = {
   order_number: string;
+  order_number_full: string;
   part_number: string;
   due_quantity: number;
   assn_number: string;
@@ -145,7 +146,7 @@ function WelcomePage() {
                             <TableRow 
                               key={index}
                               hover
-                              onClick={(_event) => handleTableClick(order.order_number)}
+                              onClick={(_event) => handleTableClick(order.order_number_full)}
                               role="checkbox"
                               tabIndex={-1}
                               sx={{ cursor: 'pointer' }}

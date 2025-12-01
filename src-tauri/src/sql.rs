@@ -15,7 +15,7 @@ pub async fn get_orders() -> Result<Vec<Order>, String> {
     "SELECT DISTINCT om.ORDNUM_10, om.PRTNUM_10, om.DUEQTY_10, 
         CASE pm.TYPE_01 WHEN 'S'        THEN pm.PRTNUM_01
                                         ELSE om.PRTNUM_10
-        END AS ASSPRT
+        END AS ASSPRT, om.ORDER_10
 FROM    Requirement_Detail rd, Order_Master om, Product_Structure ps, Part_Master pm
 WHERE   om.ORDNUM_10 = rd.ORDNUM_11
         AND (LEFT(om.ORDNUM_10, 1) = '5' OR LEFT(om.ORDNUM_10, 1) = '7')
@@ -43,9 +43,11 @@ ORDER BY om.ORDNUM_10 DESC"; // om.PLANID_10 != '000' removes screws?
             let part_number: Option<&str> = row.get(1);
             let due_quantity: Option<f64> = row.get(2);
             let assn_number: Option<&str> = row.get(3);
+            let order_number_full: Option<&str> = row.get(4);
 
             orders.push(Order {
                 order_number: order_number.map(|s| s.to_string()).expect("ordernumber should have a value"),
+                order_number_full: order_number_full.map(|s| s.to_string()).expect("order should have a value"),
                 part_number: part_number.map(|s| s.to_string()).expect("part_number should have a value"),
                 due_quantity: due_quantity.expect("due_quantity should have a value"),
                 assn_number: assn_number.map(|s| s.to_string()).expect("assn_number should have a value"),
@@ -92,6 +94,7 @@ WHERE   (om.ORDNUM_10 = @P1 OR om.ORDER_10 = @P1)
 
             orders.push(Order {
                 order_number: order_number.map(|s| s.to_string()).expect("ordernumber should have a value"),
+                order_number_full: order_number.map(|s| s.to_string()).expect("ordernumber should have a value"), // value not needed here
                 part_number: part_number.map(|s| s.to_string()).expect("part_number should have a value"),
                 due_quantity: due_quantity.expect("due_quantity should have a value"),
                 assn_number: assn_number.map(|s| s.to_string()).expect("assn_number should have a value"),

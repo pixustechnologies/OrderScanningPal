@@ -3,6 +3,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize)]
 pub struct Order {
     pub order_number: String,
+    pub order_number_full: String,
     pub part_number: String,
     pub due_quantity: f64,
     pub assn_number: String,
